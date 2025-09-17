@@ -5,6 +5,7 @@ import type { UserReviewSubmission, Review } from '../types/types';
 import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
+import { auth } from '../lib/firebase';
 
 const db = getFirestore(getApp());
 
@@ -33,7 +34,7 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
           return {
             id: doc.id,
             userId: data.userId || 'anonymous',
-            userName: data.userName || 'Foodie',
+            userName: data.userName || 'Food Lover',
             rating: Number(data.rating) || 0,
             comment: data.comment || '',
             enhancedComment: data.enhancedComment,
@@ -312,12 +313,15 @@ const WriteReviewForm: React.FC<{
       };
 
       // Create review object for Firestore
+      const displayName = auth.currentUser?.displayName || user?.name || 'Food Lover';
       const reviewForFirestore = {
         dishName: formData.dishName,
         restaurantName: formData.restaurantName,
         rating: formData.rating,
         comment: formData.comment,
         location: formData.location,
+        userId: auth.currentUser?.uid || user?.id || 'anonymous',
+        userName: displayName,
         timestamp: serverTimestamp()
       };
 

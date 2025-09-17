@@ -14,7 +14,30 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(user || {} as any);
 
-  if (!isOpen || !user) return null;
+  if (!isOpen) return null;
+  if (!user) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">My Profile</h2>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
+            </div>
+            <div className="flex items-center space-x-4 mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                <User className="w-10 h-10 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-gray-900">Food Lover</h3>
+              </div>
+            </div>
+            <p className="text-gray-600">Please sign in to view your profile.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Ensure we show the real name from Firebase Auth or Firestore users/{uid}
   useEffect(() => {
