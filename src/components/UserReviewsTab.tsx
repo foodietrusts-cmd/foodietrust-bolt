@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import '../lib/firebase';
 
 const db = getFirestore(getApp());
 
