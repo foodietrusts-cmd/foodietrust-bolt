@@ -28,7 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { login, register } = useAuth();
+  const { login, register, googleLogin } = useAuth();
 
   if (!isOpen) return null;
 
@@ -43,9 +43,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
     
     try {
-      // Simulate social login
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const success = await login(`user@${provider}.com`, 'social-login');
+      let success = false;
+      if (provider === 'google') {
+        success = await googleLogin();
+      } else {
+        // For non-Google providers, keep existing mock flow
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        success = await login(`user@${provider}.com`, 'social-login');
+      }
       if (success) {
         onClose();
       } else {

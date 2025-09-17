@@ -1,11 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User } from '../types/types';
+import { auth } from '../lib/firebase';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   register: (userData: RegisterData) => Promise<boolean>;
   logout: () => void;
+  googleLogin: () => Promise<boolean>;
   updateProfile: (updates: Partial<User>) => Promise<boolean>;
   isLoading: boolean;
 }
@@ -33,12 +36,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const savedUser = localStorage.getItem('foodietrust_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Prefer Firebase auth state; fall back to any stored session if present
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const mappedUser: User = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Anonymous User',
+          email: firebaseUser.email || `${firebaseUser.uid}@example.com`,
+          avatar: firebaseUser.photoURL || undefined,
+          preferences: {
+            cuisines: [],
+            dietaryRestrictions: [],
+            spiceLevel: 'medium',
+            budgetRange: [100, 500],
+            mealTimes: ['lunch', 'dinner'],
+            allergies: [],
+            preferredLanguage: 'en'
+          },
+          trustScore: 80,
+          reviewCount: 0,
+          joinDate: new Date().toISOString().split('T')[0],
+          location: '',
+          favoriteRestaurants: [],
+          favoriteDishes: [],
+          reviewHistory: [],
+          isVerified: true,
+          loginMethod: 'google',
+          lastActive: new Date().toISOString(),
+          engagementScore: 0,
+          helpfulVotes: 0,
+          photosUploaded: 0,
+          followersCount: 0,
+          followingCount: 0,
+        };
+        setUser(mappedUser);
+        localStorage.setItem('foodietrust_user', JSON.stringify(mappedUser));
+      } else {
+        const savedUser = localStorage.getItem('foodietrust_user');
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
+        } else {
+          setUser(null);
+        }
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
@@ -76,6 +120,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (error) {
       console.error('Login failed:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      const mappedUser: User = {
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName || 'Anonymous User',
+        email: firebaseUser.email || `${firebaseUser.uid}@example.com`,
+        avatar: firebaseUser.photoURL || undefined,
+        preferences: {
+          cuisines: [],
+          dietaryRestrictions: [],
+          spiceLevel: 'medium',
+          budgetRange: [100, 500],
+          mealTimes: ['lunch', 'dinner'],
+          allergies: [],
+          preferredLanguage: 'en'
+        },
+        trustScore: 80,
+        reviewCount: 0,
+        joinDate: new Date().toISOString().split('T')[0],
+        location: '',
+        favoriteRestaurants: [],
+        favoriteDishes: [],
+        reviewHistory: [],
+        isVerified: true,
+        loginMethod: 'google',
+        lastActive: new Date().toISOString(),
+        engagementScore: 0,
+        helpfulVotes: 0,
+        photosUploaded: 0,
+        followersCount: 0,
+        followingCount: 0,
+      };
+      setUser(mappedUser);
+      localStorage.setItem('foodietrust_user', JSON.stringify(mappedUser));
+      return true;
+    } catch (error) {
+      console.error('Google login failed:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -123,8 +214,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('foodietrust_user');
+    signOut(auth).catch(() => void 0).finally(() => {
+      setUser(null);
+      localStorage.removeItem('foodietrust_user');
+    });
   };
 
   const updateProfile = async (updates: Partial<User>): Promise<boolean> => {
@@ -147,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       login,
       register,
       logout,
+      googleLogin,
       updateProfile,
       isLoading
     }}>
