@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User } from '../types/types';
-import { auth } from '../lib/firebase';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -36,111 +37,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Prefer Firebase auth state; fall back to any stored session if present
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        const mappedUser: User = {
-          id: firebaseUser.uid,
+    const mapFirebaseToAppUser = async (firebaseUser: FirebaseUser): Promise<User> => {
+      // Try Firestore users/{uid}
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        // Create default doc if missing
+        await setDoc(userRef, {
           name: firebaseUser.displayName || 'Anonymous User',
           email: firebaseUser.email || `${firebaseUser.uid}@example.com`,
-          avatar: firebaseUser.photoURL || undefined,
-          preferences: {
-            cuisines: [],
-            dietaryRestrictions: [],
-            spiceLevel: 'medium',
-            budgetRange: [100, 500],
-            mealTimes: ['lunch', 'dinner'],
-            allergies: [],
-            preferredLanguage: 'en'
-          },
-          trustScore: 80,
-          reviewCount: 0,
-          joinDate: new Date().toISOString().split('T')[0],
-          location: '',
-          favoriteRestaurants: [],
-          favoriteDishes: [],
-          reviewHistory: [],
-          isVerified: true,
-          loginMethod: 'google',
-          lastActive: new Date().toISOString(),
-          engagementScore: 0,
-          helpfulVotes: 0,
-          photosUploaded: 0,
-          followersCount: 0,
-          followingCount: 0,
-        };
-        setUser(mappedUser);
-        localStorage.setItem('foodietrust_user', JSON.stringify(mappedUser));
-      } else {
-        const savedUser = localStorage.getItem('foodietrust_user');
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
-        } else {
-          setUser(null);
-        }
+          createdAt: serverTimestamp(),
+          preferences: { cuisines: [], spiceLevel: '', budgetRange: '' }
+        });
       }
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data - in real app, this would come from API
-      const mockUser: User = {
-        id: '1',
-        name: 'Food Lover',
-        email,
-        trustScore: 85,
-        reviewCount: 23,
-        joinDate: '2024-01-15',
-        location: 'Mumbai, India',
-        favoriteRestaurants: [],
-        favoriteDishes: [],
-        reviewHistory: [],
-        isVerified: true,
-        preferences: {
-          cuisines: ['Indian', 'Italian'],
-          dietaryRestrictions: [],
-          spiceLevel: 'medium',
-          budgetRange: [100, 500],
-          mealTimes: ['lunch', 'dinner'],
-          allergies: [],
-          preferredLanguage: 'en'
-        }
-      };
-
-      setUser(mockUser);
-      localStorage.setItem('foodietrust_user', JSON.stringify(mockUser));
-      return true;
-    } catch (error) {
-      console.error('Login failed:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const googleLogin = async (): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      const data = (await getDoc(userRef)).data() as any;
+      const nameFromDoc = data?.name as string | undefined;
+      const cuisines: string[] = Array.isArray(data?.preferences?.cuisines) ? data.preferences.cuisines : [];
+      const spiceLevelRaw = (data?.preferences?.spiceLevel || 'medium') as string;
+      const spiceLevel = ['mild','medium','hot','extra-hot'].includes(spiceLevelRaw) ? spiceLevelRaw as any : 'medium';
       const mappedUser: User = {
         id: firebaseUser.uid,
-        name: firebaseUser.displayName || 'Anonymous User',
-        email: firebaseUser.email || `${firebaseUser.uid}@example.com`,
+        name: nameFromDoc || firebaseUser.displayName || 'Anonymous User',
+        email: data?.email || firebaseUser.email || `${firebaseUser.uid}@example.com`,
         avatar: firebaseUser.photoURL || undefined,
         preferences: {
-          cuisines: [],
+          cuisines,
           dietaryRestrictions: [],
-          spiceLevel: 'medium',
+          spiceLevel,
           budgetRange: [100, 500],
           mealTimes: ['lunch', 'dinner'],
           allergies: [],
@@ -162,8 +85,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         followersCount: 0,
         followingCount: 0,
       };
-      setUser(mappedUser);
-      localStorage.setItem('foodietrust_user', JSON.stringify(mappedUser));
+      return mappedUser;
+    };
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          const mapped = await mapFirebaseToAppUser(firebaseUser);
+          setUser(mapped);
+          localStorage.setItem('foodietrust_user', JSON.stringify(mapped));
+        } else {
+          const savedUser = localStorage.getItem('foodietrust_user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          } else {
+            setUser(null);
+          }
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      // Ensure users/{uid} exists
+      const userRef = doc(db, 'users', cred.user.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          name: email.split('@')[0],
+          email,
+          createdAt: serverTimestamp(),
+          preferences: { cuisines: [], spiceLevel: '', budgetRange: '' }
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error('Login failed:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          name: firebaseUser.displayName || 'Anonymous User',
+          email: firebaseUser.email || `${firebaseUser.uid}@example.com`,
+          createdAt: serverTimestamp(),
+          preferences: { cuisines: [], spiceLevel: '', budgetRange: '' }
+        });
+      }
       return true;
     } catch (error) {
       console.error('Google login failed:', error);
@@ -176,34 +162,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: RegisterData): Promise<boolean> => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newUser: User = {
-        id: Date.now().toString(),
+      const cred = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
+      const userRef = doc(db, 'users', cred.user.uid);
+      await setDoc(userRef, {
         name: userData.name,
         email: userData.email,
-        trustScore: 50, // Starting trust score
-        reviewCount: 0,
-        joinDate: new Date().toISOString().split('T')[0],
-        location: userData.location,
-        favoriteRestaurants: [],
-        favoriteDishes: [],
-        reviewHistory: [],
-        isVerified: false,
-        preferences: {
-          cuisines: userData.preferences.cuisines || [],
-          dietaryRestrictions: userData.preferences.dietaryRestrictions || [],
-          spiceLevel: userData.preferences.spiceLevel || 'medium',
-          budgetRange: userData.preferences.budgetRange || [100, 500],
-          mealTimes: userData.preferences.mealTimes || ['lunch', 'dinner'],
-          allergies: userData.preferences.allergies || [],
-          preferredLanguage: userData.preferences.preferredLanguage || 'en'
-        }
-      };
-
-      setUser(newUser);
-      localStorage.setItem('foodietrust_user', JSON.stringify(newUser));
+        createdAt: serverTimestamp(),
+        preferences: { cuisines: [], spiceLevel: '', budgetRange: '' }
+      });
       return true;
     } catch (error) {
       console.error('Registration failed:', error);
