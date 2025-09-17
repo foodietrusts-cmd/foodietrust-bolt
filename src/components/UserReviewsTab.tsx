@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
 
@@ -20,52 +20,47 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
   const [sortBy, setSortBy] = useState<'recent' | 'helpful' | 'rating'>('recent');
   const { user } = useAuth();
 
-  // Mock reviews data
+  // Load reviews from Firestore
   useEffect(() => {
-    const mockReviews: Review[] = [
-      {
-        id: '1',
-        userId: 'user1',
-        userName: 'Priya Sharma',
-        rating: 5,
-        comment: 'Absolutely amazing butter chicken! The gravy was rich and creamy, chicken was tender. Perfect balance of spices. Must try!',
-        enhancedComment: 'This butter chicken delivers an exceptional dining experience with its perfectly balanced, rich and creamy gravy complemented by incredibly tender chicken. The spice blend is masterfully crafted, making this a must-try dish for anyone seeking authentic Indian flavors.',
-        trustScore: 92,
-        date: '2024-01-15T10:30:00Z',
-        images: ['https://images.pexels.com/photos/2474661/pexels-photo-2474661.jpeg?auto=compress&cs=tinysrgb&w=400'],
-        helpful: 23,
-        verified: true,
-        userTrustScore: 89
-      },
-      {
-        id: '2',
-        userId: 'user2',
-        userName: 'Rahul Kumar',
-        rating: 4,
-        comment: 'Good pizza but crust was a bit thick for my taste. Toppings were fresh though.',
-        enhancedComment: 'This pizza offers fresh, quality toppings that shine through in every bite. While the crust leans toward the thicker side, which may not suit all preferences, the overall quality and freshness of ingredients make it a solid choice for pizza lovers.',
-        trustScore: 85,
-        date: '2024-01-14T18:45:00Z',
-        helpful: 12,
-        verified: false,
-        userTrustScore: 76
-      },
-      {
-        id: '3',
-        userId: 'user3',
-        userName: 'Sneha Patel',
-        rating: 5,
-        comment: 'Best pad thai in the city! Perfect balance of sweet, sour and spicy. Prawns were huge and fresh.',
-        enhancedComment: 'This pad thai stands out as the city\'s finest, achieving the perfect harmony of sweet, sour, and spicy flavors that define authentic Thai cuisine. The generous, fresh prawns elevate the dish to exceptional heights, making it an absolute must-try for Thai food enthusiasts.',
-        trustScore: 96,
-        date: '2024-01-13T20:15:00Z',
-        images: ['https://images.pexels.com/photos/1199957/pexels-photo-1199957.jpeg?auto=compress&cs=tinysrgb&w=400'],
-        helpful: 34,
-        verified: true,
-        userTrustScore: 94
+    const loadReviews = async () => {
+      try {
+        const reviewsRef = collection(db, 'reviews');
+        const q = query(reviewsRef, orderBy('timestamp', 'desc'));
+        const snapshot = await getDocs(q);
+        const loaded: Review[] = snapshot.docs.map((doc) => {
+          const data = doc.data() as any;
+          const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+          return {
+            id: doc.id,
+            userId: data.userId || 'anonymous',
+            userName: data.userName || 'Foodie',
+            rating: Number(data.rating) || 0,
+            comment: data.comment || '',
+            enhancedComment: data.enhancedComment,
+            trustScore: Number(data.trustScore) || 80,
+            date: ts.toISOString(),
+            images: Array.isArray(data.images) ? data.images : [],
+            helpful: Number(data.helpful) || 0,
+            verified: Boolean(data.verified),
+            userTrustScore: Number(data.userTrustScore) || 80,
+            likes: Number(data.likes) || 0,
+            isHelpful: Boolean(data.isHelpful) || false,
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            dishType: data.dishType || 'unknown',
+            spiceLevel: data.spiceLevel,
+            portionSize: data.portionSize,
+            textureNotes: data.textureNotes,
+            aromaNotes: data.aromaNotes,
+            visualAppeal: Number(data.visualAppeal) || 0,
+            wouldRecommend: Boolean(data.wouldRecommend) || false,
+          };
+        });
+        setReviews(loaded);
+      } catch (err) {
+        console.error('❌ Error loading reviews from Firebase:', err);
       }
-    ];
-    setReviews(mockReviews);
+    };
+    loadReviews();
   }, []);
 
   const filteredReviews = reviews.filter(review => {
@@ -342,6 +337,43 @@ const WriteReviewForm: React.FC<{
         setFormData({ dishName: '', restaurantName: '', rating: 0, comment: '', location: '', images: [] });
         setImages([]);
         onBack();
+        // After returning to browse, reload reviews
+        try {
+          const reviewsRef = collection(db, 'reviews');
+          const q = query(reviewsRef, orderBy('timestamp', 'desc'));
+          const snapshot = await getDocs(q);
+          const loaded: Review[] = snapshot.docs.map((doc) => {
+            const data = doc.data() as any;
+            const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+            return {
+              id: doc.id,
+              userId: data.userId || 'anonymous',
+              userName: data.userName || 'Foodie',
+              rating: Number(data.rating) || 0,
+              comment: data.comment || '',
+              enhancedComment: data.enhancedComment,
+              trustScore: Number(data.trustScore) || 80,
+              date: ts.toISOString(),
+              images: Array.isArray(data.images) ? data.images : [],
+              helpful: Number(data.helpful) || 0,
+              verified: Boolean(data.verified),
+              userTrustScore: Number(data.userTrustScore) || 80,
+              likes: Number(data.likes) || 0,
+              isHelpful: Boolean(data.isHelpful) || false,
+              tags: Array.isArray(data.tags) ? data.tags : [],
+              dishType: data.dishType || 'unknown',
+              spiceLevel: data.spiceLevel,
+              portionSize: data.portionSize,
+              textureNotes: data.textureNotes,
+              aromaNotes: data.aromaNotes,
+              visualAppeal: Number(data.visualAppeal) || 0,
+              wouldRecommend: Boolean(data.wouldRecommend) || false,
+            };
+          });
+          setReviews(loaded);
+        } catch (reloadErr) {
+          console.error('❌ Error reloading reviews after submit:', reloadErr);
+        }
       } else {
         setError('Failed to submit review. Please try again.');
       }
