@@ -20,7 +20,7 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
   const [sortBy, setSortBy] = useState<'recent' | 'helpful' | 'rating'>('recent');
   const { user } = useAuth();
 
-  // Load reviews from Firestore
+  // Load reviews from Firestore when browsing
   useEffect(() => {
     const loadReviews = async () => {
       try {
@@ -60,8 +60,10 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
         console.error('❌ Error loading reviews from Firebase:', err);
       }
     };
-    loadReviews();
-  }, []);
+    if (activeView === 'browse') {
+      loadReviews();
+    }
+  }, [activeView]);
 
   const filteredReviews = reviews.filter(review => {
     const matchesSearch = review.comment.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -337,43 +339,6 @@ const WriteReviewForm: React.FC<{
         setFormData({ dishName: '', restaurantName: '', rating: 0, comment: '', location: '', images: [] });
         setImages([]);
         onBack();
-        // After returning to browse, reload reviews
-        try {
-          const reviewsRef = collection(db, 'reviews');
-          const q = query(reviewsRef, orderBy('timestamp', 'desc'));
-          const snapshot = await getDocs(q);
-          const loaded: Review[] = snapshot.docs.map((doc) => {
-            const data = doc.data() as any;
-            const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
-            return {
-              id: doc.id,
-              userId: data.userId || 'anonymous',
-              userName: data.userName || 'Foodie',
-              rating: Number(data.rating) || 0,
-              comment: data.comment || '',
-              enhancedComment: data.enhancedComment,
-              trustScore: Number(data.trustScore) || 80,
-              date: ts.toISOString(),
-              images: Array.isArray(data.images) ? data.images : [],
-              helpful: Number(data.helpful) || 0,
-              verified: Boolean(data.verified),
-              userTrustScore: Number(data.userTrustScore) || 80,
-              likes: Number(data.likes) || 0,
-              isHelpful: Boolean(data.isHelpful) || false,
-              tags: Array.isArray(data.tags) ? data.tags : [],
-              dishType: data.dishType || 'unknown',
-              spiceLevel: data.spiceLevel,
-              portionSize: data.portionSize,
-              textureNotes: data.textureNotes,
-              aromaNotes: data.aromaNotes,
-              visualAppeal: Number(data.visualAppeal) || 0,
-              wouldRecommend: Boolean(data.wouldRecommend) || false,
-            };
-          });
-          setReviews(loaded);
-        } catch (reloadErr) {
-          console.error('❌ Error reloading reviews after submit:', reloadErr);
-        }
       } else {
         setError('Failed to submit review. Please try again.');
       }
