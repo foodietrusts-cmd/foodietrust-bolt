@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
+import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
+
+const db = getFirestore(getApp());
 
 interface UserReviewsTabProps {
   onSubmitReview: (review: UserReviewSubmission) => Promise<boolean>;
@@ -309,8 +313,33 @@ const WriteReviewForm: React.FC<{
         images: images.length > 0 ? images : undefined
       };
 
+      // Create review object for Firestore
+      const reviewForFirestore = {
+        dishName: formData.dishName,
+        restaurantName: formData.restaurantName,
+        rating: formData.rating,
+        comment: formData.comment,
+        location: formData.location,
+        timestamp: serverTimestamp()
+      };
+
+      let firebaseSaved = false;
+      try {
+        await addDoc(collection(db, 'reviews'), reviewForFirestore);
+        firebaseSaved = true;
+      } catch (firebaseError) {
+        // Keep UI flow intact; log Firebase error without interrupting existing submit behavior
+        console.error('❌ Error saving review:', firebaseError);
+      }
+
       const success = await onSubmitReview(reviewData);
       if (success) {
+        if (firebaseSaved) {
+          console.log('✅ Review submitted and saved to Firebase!', reviewForFirestore);
+        }
+        // Reset form after successful submission
+        setFormData({ dishName: '', restaurantName: '', rating: 0, comment: '', location: '', images: [] });
+        setImages([]);
         onBack();
       } else {
         setError('Failed to submit review. Please try again.');
