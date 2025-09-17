@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Star, MapPin, Calendar, Shield, Edit3, Camera, Award, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -13,6 +15,31 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
   const [editData, setEditData] = useState(user || {} as any);
 
   if (!isOpen || !user) return null;
+
+  // Ensure we show the real name from Firebase Auth or Firestore users/{uid}
+  useEffect(() => {
+    let isMounted = true;
+    const resolveUserName = async () => {
+      try {
+        const authName = auth.currentUser?.displayName;
+        let firestoreName: string | undefined;
+        if (user.id) {
+          const snap = await getDoc(doc(db, 'users', user.id));
+          if (snap.exists()) {
+            const data = snap.data() as any;
+            firestoreName = data?.name;
+          }
+        }
+        const resolved = firestoreName || authName || user.name;
+        if (resolved && resolved !== user.name) {
+          await updateProfile({ name: resolved });
+          if (isMounted) setEditData((prev: any) => ({ ...prev, name: resolved }));
+        }
+      } catch {}
+    };
+    resolveUserName();
+    return () => { isMounted = false; };
+  }, [user.id]);
 
   const handleSave = async () => {
     const success = await updateProfile(editData);
@@ -80,7 +107,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                   className="text-2xl font-bold text-gray-900 bg-transparent border-b border-gray-300 focus:border-orange-500 outline-none"
                 />
               ) : (
-                <h3 className="text-2xl font-bold text-gray-900">{user.name}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{user?.name || 'Food Lover'}</h3>
               )}
               <div className="flex items-center space-x-4 mt-2">
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${trustLevel.bg}`}>
