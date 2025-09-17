@@ -79,7 +79,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
     return { level: 'New', color: 'text-gray-600', bg: 'bg-gray-100' };
   };
 
-  const trustLevel = getTrustLevel(user.trustScore);
+  const trustLevel = getTrustLevel(user?.trustScore || 0);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -109,8 +109,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
           <div className="flex items-center space-x-4 mb-8">
             <div className="relative">
               <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                {user?.avatar ? (
+                  <img src={user.avatar} alt={user?.name || 'Food Lover'} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <User className="w-10 h-10 text-white" />
                 )}
@@ -136,10 +136,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${trustLevel.bg}`}>
                   <Shield className={`w-4 h-4 ${trustLevel.color}`} />
                   <span className={`text-sm font-medium ${trustLevel.color}`}>
-                    {trustLevel.level} • {user.trustScore}
+                    {trustLevel.level} • {user?.trustScore ?? 0}
                   </span>
                 </div>
-                {user.isVerified && (
+                {user?.isVerified && (
                   <div className="flex items-center space-x-1 text-green-600">
                     <Award className="w-4 h-4" />
                     <span className="text-sm font-medium">Verified</span>
@@ -151,16 +151,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user.reviewCount}</div>
+              <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="text-2xl font-bold text-gray-900">{user?.reviewCount ?? 0}</div>
               <div className="text-sm text-gray-600">Reviews</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user.favoriteDishes.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{user?.favoriteDishes?.length ?? 0}</div>
               <div className="text-sm text-gray-600">Favorites</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user.favoriteRestaurants.length}</div>
+              <div className="text-2xl font-bold text-gray-900">{user?.favoriteRestaurants?.length ?? 0}</div>
               <div className="text-sm text-gray-600">Restaurants</div>
             </div>
           </div>
@@ -180,12 +180,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <span className="text-gray-700">{user.location}</span>
+                    <span className="text-gray-700">{user?.location || '-'}</span>
                   )}
                 </div>
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-700">Joined {user.joinDate}</span>
+                  <span className="text-gray-700">Joined {user?.joinDate || '-'}</span>
                 </div>
               </div>
             </div>
@@ -223,7 +223,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {user.preferences.cuisines.map(cuisine => (
+                      {(user?.preferences?.cuisines || []).map(cuisine => (
                         <span key={cuisine} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
                           {cuisine}
                         </span>
@@ -250,14 +250,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                     </select>
                   ) : (
                     <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm capitalize">
-                      {user.preferences.spiceLevel}
+                      {user?.preferences?.spiceLevel || 'medium'}
                     </span>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Budget Range</label>
-                  <span className="text-gray-700">₹{user.preferences.budgetRange[0]} - ₹{user.preferences.budgetRange[1]}</span>
+                  <span className="text-gray-700">₹{user?.preferences?.budgetRange?.[0] ?? 0} - ₹{user?.preferences?.budgetRange?.[1] ?? 0}</span>
                 </div>
               </div>
             </div>
