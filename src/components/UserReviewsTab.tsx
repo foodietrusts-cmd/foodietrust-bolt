@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
-import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
 import { auth } from '../lib/firebase';
@@ -60,7 +60,30 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
             dishName: data.dishName || ''
           };
         });
-        setReviews(loaded);
+        // Enrich reviewer names from Auth or Firestore if placeholder
+        const needsLookup = new Set<string>();
+        loaded.forEach(r => {
+          if (!r.userName || r.userName === 'Food Lover' || r.userName === 'Foodie') {
+            if (r.userId && r.userId !== 'anonymous') needsLookup.add(r.userId);
+          }
+        });
+        const idToName: Record<string, string> = {};
+        // If current user present, prefer their displayName
+        if (auth.currentUser?.uid && auth.currentUser.displayName) {
+          idToName[auth.currentUser.uid] = auth.currentUser.displayName;
+        }
+        for (const uid of needsLookup) {
+          try {
+            const snap = await getDoc(doc(db, 'users', uid));
+            const name = (snap.exists() && (snap.data() as any)?.name) || undefined;
+            if (name) idToName[uid] = name;
+          } catch {}
+        }
+        const merged = loaded.map(r => ({
+          ...r,
+          userName: idToName[r.userId] || r.userName || 'Food Lover'
+        }));
+        setReviews(merged);
       } catch (err) {
         console.error('❌ Error loading reviews from Firebase:', err);
       }
