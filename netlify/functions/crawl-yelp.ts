@@ -24,7 +24,9 @@ function extractDishMentions(text: string): string[] {
 
 export const handler: Handler = async () => {
   try {
-    if (!YELP_API_KEY) throw new Error('Missing YELP_API_KEY');
+    if (!YELP_API_KEY) {
+      return { statusCode: 200, body: JSON.stringify({ ok: true, skipped: 'yelp', reason: 'Missing YELP_API_KEY' }) };
+    }
 
     // Search popular restaurants in Chennai
     const search = await yelp('/businesses/search', { location: 'Chennai, IN', term: 'restaurants', limit: '20', sort_by: 'rating' });
