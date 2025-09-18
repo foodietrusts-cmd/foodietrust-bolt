@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /dishes/{dishId} {
+      allow read: if true;
+      allow write: if false; // only backend/netlify functions should write dishes
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.userName is string
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+          && request.resource.data.comment is string
+          && request.resource.data.comment.size() >= 10;
+      }
+    }
+
+    // Global reviews collection (optional analytics)
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userName is string
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() >= 10;
+    }
+  }
+}
+
