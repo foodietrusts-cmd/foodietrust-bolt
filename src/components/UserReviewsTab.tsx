@@ -6,6 +6,7 @@ import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orde
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
 import { auth } from '../lib/firebase';
+import { ensureDishAndGetId, addReviewUnderDish } from '../lib/dataService';
 
 const db = getFirestore(getApp());
 
@@ -327,11 +328,29 @@ const WriteReviewForm: React.FC<{
 
       let firebaseSaved = false;
       try {
+        // Save to a global reviews collection (optional) for analytics
         await addDoc(collection(db, 'reviews'), reviewForFirestore);
         firebaseSaved = true;
       } catch (firebaseError) {
         // Keep UI flow intact; log Firebase error without interrupting existing submit behavior
         console.error('❌ Error saving review:', firebaseError);
+      }
+
+      // Link review to a dish document and store under dishes/{dishId}/reviews
+      try {
+        const dishId = await ensureDishAndGetId({
+          name: formData.dishName,
+          restaurantName: formData.restaurantName,
+          location: formData.location || ''
+        });
+        await addReviewUnderDish(dishId, {
+          userId: auth.currentUser?.uid || user?.id || 'anonymous',
+          userName: reviewForFirestore.userName,
+          rating: formData.rating,
+          comment: formData.comment
+        });
+      } catch (linkErr) {
+        console.error('❌ Error linking review to dish:', linkErr);
       }
 
       const success = await onSubmitReview(reviewData);
