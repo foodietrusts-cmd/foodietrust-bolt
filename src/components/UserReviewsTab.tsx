@@ -55,6 +55,9 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
             aromaNotes: data.aromaNotes,
             visualAppeal: Number(data.visualAppeal) || 0,
             wouldRecommend: Boolean(data.wouldRecommend) || false,
+            // extra fields for display
+            restaurantName: data.restaurantName || '',
+            dishName: data.dishName || ''
           };
         });
         setReviews(loaded);
@@ -323,6 +326,9 @@ const WriteReviewForm: React.FC<{
         location: formData.location,
         userId: auth.currentUser?.uid || user?.id || 'anonymous',
         userName: displayName,
+        userEmail: auth.currentUser?.email || '',
+        userAvatar: auth.currentUser?.photoURL || '',
+        trustScore: user?.trustScore ?? 80,
         timestamp: serverTimestamp()
       };
 
