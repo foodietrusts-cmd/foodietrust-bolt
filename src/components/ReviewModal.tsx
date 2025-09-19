@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
-import { postReview } from '../reviews';
+import { postReview } from '../lib/reviewService';
 
 interface ReviewModalProps {
   restaurantId: string;
   onClose: () => void;
 }
 
-export default function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
+export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
   const [dishName, setDishName] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
