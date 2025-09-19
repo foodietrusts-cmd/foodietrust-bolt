@@ -34,6 +34,10 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
             id: doc.id,
             userId: data.userId || 'anonymous',
             userName: data.userName || 'Foodie',
+            userEmail: data.userEmail || '',
+            userAvatar: data.userAvatar || '',
+            dishName: data.dishName || '',
+            restaurantName: data.restaurantName || '',
             rating: Number(data.rating) || 0,
             comment: data.comment || '',
             enhancedComment: data.enhancedComment,
@@ -311,14 +315,20 @@ const WriteReviewForm: React.FC<{
         images: images.length > 0 ? images : undefined
       };
 
-      // Create review object for Firestore
+      // Create review object for Firestore with complete user metadata
       const reviewForFirestore = {
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        userAvatar: user.avatar || '',
         dishName: formData.dishName,
         restaurantName: formData.restaurantName,
         rating: formData.rating,
         comment: formData.comment,
         location: formData.location,
-        timestamp: serverTimestamp()
+        timestamp: serverTimestamp(),
+        images: images.map(img => img.name), // Store image filenames for now
+        tags: formData.tags || []
       };
 
       let firebaseSaved = false;

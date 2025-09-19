@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
-import { postReview } from '../reviews';
+import { postReview } from '../lib/reviewService';
 
 interface ReviewModalProps {
   restaurantId: string;

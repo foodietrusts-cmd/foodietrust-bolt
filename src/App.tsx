@@ -9,7 +9,7 @@ import { FilterPanel } from './components/FilterPanel';
 import { PersonalizedRecommendations } from './components/PersonalizedRecommendations';
 import { AuthModal } from './components/AuthModal';
 import { AIChat } from './components/AIChat';
-import { ReviewModal } from './components/ReviewModal';
+import ReviewModal from './components/ReviewModal';
 import { UserProfile } from './components/UserProfile';
 import { UserReviewsTab } from './components/UserReviewsTab';
 import { RestaurantPromotionsTab } from './components/RestaurantPromotionsTab';
@@ -17,10 +17,13 @@ import { AdBanner } from './components/AdBanner';
 import { RevenueAnalytics } from './components/RevenueAnalytics';
 import { EngagementPrompts, CommunityStats } from './components/EngagementPrompts';
 import { mockDishes } from './data/mockData';
+import { searchDishesInFirebase } from './lib/dishService';
 import type { Dish, FilterOptions, ReviewPost, UserReviewSubmission } from './types/types';
 
 function AppContent() {
   const [dishes, setDishes] = useState<Dish[]>(mockDishes);
+  const [firebaseDishes, setFirebaseDishes] = useState<Dish[]>([]);
+  const [isSearchingFirebase, setIsSearchingFirebase] = useState(false);
   const [activeTab, setActiveTab] = useState<'discover' | 'reviews' | 'promotions' | 'analytics'>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
@@ -40,7 +43,34 @@ function AppContent() {
   
   const { user, logout } = useAuth();
 
-  const filteredDishes = dishes.filter(dish => {
+  // Search Firebase dishes when search query changes
+  useEffect(() => {
+    const searchFirebase = async () => {
+      if (searchQuery.trim()) {
+        setIsSearchingFirebase(true);
+        try {
+          const results = await searchDishesInFirebase(searchQuery, 'Chennai');
+          setFirebaseDishes(results);
+        } catch (error) {
+          console.error('Error searching Firebase dishes:', error);
+          setFirebaseDishes([]);
+        } finally {
+          setIsSearchingFirebase(false);
+        }
+      } else {
+        setFirebaseDishes([]);
+      }
+    };
+
+    // Debounce search
+    const timeoutId = setTimeout(searchFirebase, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Combine mock dishes and Firebase dishes for filtering
+  const allDishes = searchQuery.trim() ? [...dishes, ...firebaseDishes] : dishes;
+
+  const filteredDishes = allDishes.filter(dish => {
     const matchesSearch = dish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          dish.restaurant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          dish.cuisine.toLowerCase().includes(searchQuery.toLowerCase());
@@ -326,6 +356,9 @@ function AppContent() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
                   {searchQuery ? `Search Results (${filteredDishes.length})` : 'All Dishes'}
+                  {isSearchingFirebase && (
+                    <span className="ml-2 text-sm text-orange-600">Searching Firebase...</span>
+                  )}
                 </h2>
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4" />

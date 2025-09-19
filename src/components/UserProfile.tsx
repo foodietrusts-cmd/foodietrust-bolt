@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
-import { User, Star, MapPin, Calendar, Shield, Edit3, Camera, Award, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Star, MapPin, Calendar, Shield, Edit3, Camera, Award, TrendingUp, MessageSquare, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { getFirestore, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
+import type { Review } from '../types/types';
+
+const db = getFirestore(getApp());
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -11,6 +16,65 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
   const { user, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(user || {} as any);
+  const [userReviews, setUserReviews] = useState<Review[]>([]);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+
+  // Fetch user reviews when component opens
+  useEffect(() => {
+    const fetchUserReviews = async () => {
+      if (!user || !isOpen) return;
+      
+      setIsLoadingReviews(true);
+      try {
+        const reviewsRef = collection(db, 'reviews');
+        const q = query(
+          reviewsRef, 
+          where('userId', '==', user.id),
+          orderBy('timestamp', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        const reviews: Review[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          const ts = data.timestamp?.toDate ? data.timestamp.toDate() : new Date();
+          return {
+            id: doc.id,
+            userId: data.userId || user.id,
+            userName: data.userName || user.name,
+            userEmail: data.userEmail || user.email,
+            userAvatar: data.userAvatar || user.avatar,
+            dishName: data.dishName || '',
+            restaurantName: data.restaurantName || '',
+            rating: Number(data.rating) || 0,
+            comment: data.comment || '',
+            enhancedComment: data.enhancedComment,
+            trustScore: Number(data.trustScore) || 80,
+            date: ts.toISOString(),
+            images: Array.isArray(data.images) ? data.images : [],
+            helpful: Number(data.helpful) || 0,
+            verified: Boolean(data.verified),
+            userTrustScore: Number(data.userTrustScore) || 80,
+            likes: Number(data.likes) || 0,
+            isHelpful: Boolean(data.isHelpful) || false,
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            dishType: data.dishType || 'unknown',
+            spiceLevel: data.spiceLevel,
+            portionSize: data.portionSize,
+            textureNotes: data.textureNotes,
+            aromaNotes: data.aromaNotes,
+            visualAppeal: Number(data.visualAppeal) || 0,
+            wouldRecommend: Boolean(data.wouldRecommend) || false,
+          };
+        });
+        setUserReviews(reviews);
+      } catch (error) {
+        console.error('Error fetching user reviews:', error);
+      } finally {
+        setIsLoadingReviews(false);
+      }
+    };
+
+    fetchUserReviews();
+  }, [user, isOpen]);
 
   if (!isOpen || !user) return null;
 
@@ -102,7 +166,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user.reviewCount}</div>
+              <div className="text-2xl font-bold text-gray-900">{userReviews.length}</div>
               <div className="text-sm text-gray-600">Reviews</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-xl">
@@ -244,6 +308,61 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* User Reviews Section */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">My Reviews ({userReviews.length})</h4>
+              {isLoadingReviews ? (
+                <div className="text-center py-4">
+                  <div className="text-gray-500">Loading reviews...</div>
+                </div>
+              ) : userReviews.length > 0 ? (
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {userReviews.map((review) => (
+                    <div key={review.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h5 className="font-medium text-gray-900">{review.dishName || 'Unknown Dish'}</h5>
+                          <p className="text-sm text-gray-600">{review.restaurantName ? `at ${review.restaurantName}` : ''}</p>
+                          <p className="text-xs text-gray-500">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {new Date(review.date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-gray-700 text-sm mb-2">{review.comment}</p>
+                      {review.tags && review.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {review.tags.map((tag, index) => (
+                            <span key={index} className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+                        <span>Trust Score: {review.trustScore}/100</span>
+                        <span>{review.helpful} helpful votes</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500">No reviews yet</p>
+                  <p className="text-sm text-gray-400">Start sharing your food experiences!</p>
+                </div>
+              )}
             </div>
 
             {isEditing && (
