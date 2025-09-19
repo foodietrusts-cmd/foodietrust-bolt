@@ -3,16 +3,17 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Assume this type comes from your project's types folder
 interface ReviewPost {
   restaurantId: string;
+  dishName: string;        // ✅ added
   reviewText: string;
+  rating: number;          // ✅ added
   photoFile: File | null;
 }
 
-export const postReview = async ({ restaurantId, reviewText, photoFile }: ReviewPost) => {
+export const postReview = async ({ restaurantId, dishName, reviewText, rating, photoFile }: ReviewPost) => {
   if (!auth.currentUser) {
-    // If the user is not logged in, prompt them to sign in
+    // If the user is not logged in, sign in with Google
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   }
@@ -22,6 +23,7 @@ export const postReview = async ({ restaurantId, reviewText, photoFile }: Review
     throw new Error('Authentication failed. Please try again.');
   }
 
+  // ✅ Upload photo if provided
   let photoURL = null;
   if (photoFile) {
     const storageRef = ref(storage, `reviews/${user.uid}/${photoFile.name}`);
@@ -29,12 +31,25 @@ export const postReview = async ({ restaurantId, reviewText, photoFile }: Review
     photoURL = await getDownloadURL(storageRef);
   }
 
-  await addDoc(collection(db, `restaurants/${restaurantId}/reviews`), {
+  // ✅ Full review data
+  const reviewData = {
     userId: user.uid,
-    userName: user.displayName || 'Anonymous',
+    userName: user.displayName || 'Food Lover',
+    userEmail: user.email || 'unknown@example.com',
     userPhoto: user.photoURL || null,
-    reviewText: reviewText,
-    photoURL: photoURL,
+    restaurantId,
+    dishName,
+    reviewText,
+    rating,
+    photoURL,
     createdAt: serverTimestamp(),
-  });
+  };
+
+  // ✅ Save inside restaurant subcollection
+  await addDoc(collection(db, `restaurants/${restaurantId}/reviews`), reviewData);
+
+  // ✅ Also save in global "reviews" collection
+  await addDoc(collection(db, 'reviews'), reviewData);
+
+  console.log('✅ Review posted successfully with full user details');
 };
