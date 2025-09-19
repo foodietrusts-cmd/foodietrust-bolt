@@ -2,11 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
-import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
-import { auth } from '../lib/firebase';
-import { ensureDishAndGetId, addReviewUnderDish } from '../lib/dataService';
 
 const db = getFirestore(getApp());
 
@@ -35,7 +33,7 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
           return {
             id: doc.id,
             userId: data.userId || 'anonymous',
-            userName: data.userName || 'Food Lover',
+            userName: data.userName || 'Foodie',
             rating: Number(data.rating) || 0,
             comment: data.comment || '',
             enhancedComment: data.enhancedComment,
@@ -55,35 +53,9 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
             aromaNotes: data.aromaNotes,
             visualAppeal: Number(data.visualAppeal) || 0,
             wouldRecommend: Boolean(data.wouldRecommend) || false,
-            // extra fields for display
-            restaurantName: data.restaurantName || '',
-            dishName: data.dishName || ''
           };
         });
-        // Enrich reviewer names from Auth or Firestore if placeholder
-        const needsLookup = new Set<string>();
-        loaded.forEach(r => {
-          if (!r.userName || r.userName === 'Food Lover' || r.userName === 'Foodie') {
-            if (r.userId && r.userId !== 'anonymous') needsLookup.add(r.userId);
-          }
-        });
-        const idToName: Record<string, string> = {};
-        // If current user present, prefer their displayName
-        if (auth.currentUser?.uid && auth.currentUser.displayName) {
-          idToName[auth.currentUser.uid] = auth.currentUser.displayName;
-        }
-        for (const uid of needsLookup) {
-          try {
-            const snap = await getDoc(doc(db, 'users', uid));
-            const name = (snap.exists() && (snap.data() as any)?.name) || undefined;
-            if (name) idToName[uid] = name;
-          } catch {}
-        }
-        const merged = loaded.map(r => ({
-          ...r,
-          userName: idToName[r.userId] || r.userName || 'Food Lover'
-        }));
-        setReviews(merged);
+        setReviews(loaded);
       } catch (err) {
         console.error('❌ Error loading reviews from Firebase:', err);
       }
@@ -233,13 +205,6 @@ const ReviewCard: React.FC<{ review: Review }> = ({ review }) => {
           </div>
 
           <div className="mb-4">
-            {(((review as any).dishName) || ((review as any).restaurantName)) && (
-              <div className="text-sm text-gray-600 mb-1">
-                {((review as any).dishName || '')}
-                {((review as any).dishName && (review as any).restaurantName) ? ' @ ' : ''}
-                {((review as any).restaurantName || '')}
-              </div>
-            )}
             <div className="flex items-center space-x-2 mb-2">
               <button
                 onClick={() => setShowEnhanced(!showEnhanced)}
@@ -340,66 +305,29 @@ const WriteReviewForm: React.FC<{
     setIsSubmitting(true);
     setError('');
 
-      try {
+    try {
       const reviewData: UserReviewSubmission = {
         ...formData,
         images: images.length > 0 ? images : undefined
       };
 
       // Create review object for Firestore
-      const displayName = auth.currentUser?.displayName || user?.name || 'Food Lover';
       const reviewForFirestore = {
         dishName: formData.dishName,
         restaurantName: formData.restaurantName,
         rating: formData.rating,
         comment: formData.comment,
         location: formData.location,
-        userId: auth.currentUser?.uid || user?.id || 'anonymous',
-        userName: displayName,
-        userEmail: auth.currentUser?.email || '',
-        userAvatar: auth.currentUser?.photoURL || '',
-        trustScore: user?.trustScore ?? 80,
         timestamp: serverTimestamp()
       };
 
       let firebaseSaved = false;
       try {
-        // Ensure user profile exists for later display name lookups
-        if (auth.currentUser?.uid) {
-          const uref = doc(db, 'users', auth.currentUser.uid);
-          const usnap = await getDoc(uref);
-          if (!usnap.exists()) {
-            await setDoc(uref, {
-              name: displayName,
-              email: auth.currentUser.email || '',
-              photoURL: auth.currentUser.photoURL || '',
-              createdAt: serverTimestamp()
-            });
-          }
-        }
-        // Save to a global reviews collection (optional) for analytics
         await addDoc(collection(db, 'reviews'), reviewForFirestore);
         firebaseSaved = true;
       } catch (firebaseError) {
         // Keep UI flow intact; log Firebase error without interrupting existing submit behavior
         console.error('❌ Error saving review:', firebaseError);
-      }
-
-      // Link review to a dish document and store under dishes/{dishId}/reviews
-      try {
-        const dishId = await ensureDishAndGetId({
-          name: formData.dishName,
-          restaurantName: formData.restaurantName,
-          location: formData.location || ''
-        });
-        await addReviewUnderDish(dishId, {
-          userId: auth.currentUser?.uid || user?.id || 'anonymous',
-          userName: reviewForFirestore.userName,
-          rating: formData.rating,
-          comment: formData.comment
-        });
-      } catch (linkErr) {
-        console.error('❌ Error linking review to dish:', linkErr);
       }
 
       const success = await onSubmitReview(reviewData);

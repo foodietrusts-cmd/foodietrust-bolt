@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, Star, MapPin, Calendar, Shield, Edit3, Camera, Award, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { auth, db } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -14,55 +12,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState(user || {} as any);
 
-  if (!isOpen) return null;
-  if (!user) {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">My Profile</h2>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
-            </div>
-            <div className="flex items-center space-x-4 mb-8">
-              <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                <User className="w-10 h-10 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-2xl font-bold text-gray-900">Food Lover</h3>
-              </div>
-            </div>
-            <p className="text-gray-600">Please sign in to view your profile.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Ensure we show the real name from Firebase Auth or Firestore users/{uid}
-  useEffect(() => {
-    let isMounted = true;
-    const resolveUserName = async () => {
-      try {
-        const authName = auth.currentUser?.displayName;
-        let firestoreName: string | undefined;
-        if (user.id) {
-          const snap = await getDoc(doc(db, 'users', user.id));
-          if (snap.exists()) {
-            const data = snap.data() as any;
-            firestoreName = data?.name;
-          }
-        }
-        const resolved = firestoreName || authName || user.name;
-        if (resolved && resolved !== user.name) {
-          await updateProfile({ name: resolved });
-          if (isMounted) setEditData((prev: any) => ({ ...prev, name: resolved }));
-        }
-      } catch {}
-    };
-    resolveUserName();
-    return () => { isMounted = false; };
-  }, [user.id]);
+  if (!isOpen || !user) return null;
 
   const handleSave = async () => {
     const success = await updateProfile(editData);
@@ -79,7 +29,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
     return { level: 'New', color: 'text-gray-600', bg: 'bg-gray-100' };
   };
 
-  const trustLevel = getTrustLevel(user?.trustScore || 0);
+  const trustLevel = getTrustLevel(user.trustScore);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -109,8 +59,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
           <div className="flex items-center space-x-4 mb-8">
             <div className="relative">
               <div className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
-                {user?.avatar ? (
-                  <img src={user.avatar} alt={user?.name || 'Food Lover'} className="w-full h-full rounded-full object-cover" />
+                {user.avatar ? (
+                  <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <User className="w-10 h-10 text-white" />
                 )}
@@ -130,16 +80,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                   className="text-2xl font-bold text-gray-900 bg-transparent border-b border-gray-300 focus:border-orange-500 outline-none"
                 />
               ) : (
-                <h3 className="text-2xl font-bold text-gray-900">{user?.name || 'Food Lover'}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{user.name}</h3>
               )}
               <div className="flex items-center space-x-4 mt-2">
                 <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${trustLevel.bg}`}>
                   <Shield className={`w-4 h-4 ${trustLevel.color}`} />
                   <span className={`text-sm font-medium ${trustLevel.color}`}>
-                    {trustLevel.level} • {user?.trustScore ?? 0}
+                    {trustLevel.level} • {user.trustScore}
                   </span>
                 </div>
-                {user?.isVerified && (
+                {user.isVerified && (
                   <div className="flex items-center space-x-1 text-green-600">
                     <Award className="w-4 h-4" />
                     <span className="text-sm font-medium">Verified</span>
@@ -151,16 +101,16 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user?.reviewCount ?? 0}</div>
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="text-2xl font-bold text-gray-900">{user.reviewCount}</div>
               <div className="text-sm text-gray-600">Reviews</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user?.favoriteDishes?.length ?? 0}</div>
+              <div className="text-2xl font-bold text-gray-900">{user.favoriteDishes.length}</div>
               <div className="text-sm text-gray-600">Favorites</div>
             </div>
             <div className="text-center p-4 bg-gray-50 rounded-xl">
-              <div className="text-2xl font-bold text-gray-900">{user?.favoriteRestaurants?.length ?? 0}</div>
+              <div className="text-2xl font-bold text-gray-900">{user.favoriteRestaurants.length}</div>
               <div className="text-sm text-gray-600">Restaurants</div>
             </div>
           </div>
@@ -180,12 +130,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                       className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   ) : (
-                    <span className="text-gray-700">{user?.location || '-'}</span>
+                    <span className="text-gray-700">{user.location}</span>
                   )}
                 </div>
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-700">Joined {user?.joinDate || '-'}</span>
+                  <span className="text-gray-700">Joined {user.joinDate}</span>
                 </div>
               </div>
             </div>
@@ -223,7 +173,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {(user?.preferences?.cuisines || []).map(cuisine => (
+                      {user.preferences.cuisines.map(cuisine => (
                         <span key={cuisine} className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
                           {cuisine}
                         </span>
@@ -250,14 +200,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
                     </select>
                   ) : (
                     <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm capitalize">
-                      {user?.preferences?.spiceLevel || 'medium'}
+                      {user.preferences.spiceLevel}
                     </span>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Budget Range</label>
-                  <span className="text-gray-700">₹{user?.preferences?.budgetRange?.[0] ?? 0} - ₹{user?.preferences?.budgetRange?.[1] ?? 0}</span>
+                  <span className="text-gray-700">₹{user.preferences.budgetRange[0]} - ₹{user.preferences.budgetRange[1]}</span>
                 </div>
               </div>
             </div>
