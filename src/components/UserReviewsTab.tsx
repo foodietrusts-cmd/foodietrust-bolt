@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
-import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy, doc, getDoc, setDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import '../lib/firebase';
 import { auth } from '../lib/firebase';
@@ -233,6 +233,13 @@ const ReviewCard: React.FC<{ review: Review }> = ({ review }) => {
           </div>
 
           <div className="mb-4">
+            {(((review as any).dishName) || ((review as any).restaurantName)) && (
+              <div className="text-sm text-gray-600 mb-1">
+                {((review as any).dishName || '')}
+                {((review as any).dishName && (review as any).restaurantName) ? ' @ ' : ''}
+                {((review as any).restaurantName || '')}
+              </div>
+            )}
             <div className="flex items-center space-x-2 mb-2">
               <button
                 onClick={() => setShowEnhanced(!showEnhanced)}
@@ -333,7 +340,7 @@ const WriteReviewForm: React.FC<{
     setIsSubmitting(true);
     setError('');
 
-    try {
+      try {
       const reviewData: UserReviewSubmission = {
         ...formData,
         images: images.length > 0 ? images : undefined
@@ -357,6 +364,19 @@ const WriteReviewForm: React.FC<{
 
       let firebaseSaved = false;
       try {
+        // Ensure user profile exists for later display name lookups
+        if (auth.currentUser?.uid) {
+          const uref = doc(db, 'users', auth.currentUser.uid);
+          const usnap = await getDoc(uref);
+          if (!usnap.exists()) {
+            await setDoc(uref, {
+              name: displayName,
+              email: auth.currentUser.email || '',
+              photoURL: auth.currentUser.photoURL || '',
+              createdAt: serverTimestamp()
+            });
+          }
+        }
         // Save to a global reviews collection (optional) for analytics
         await addDoc(collection(db, 'reviews'), reviewForFirestore);
         firebaseSaved = true;
