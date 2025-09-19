@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User } from '../types/types';
-import { auth, db } from '../lib/firebase';
+import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -37,6 +37,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Mock user for development when Firebase is not configured
+    if (!isFirebaseConfigured) {
+      console.log('🔥 Using mock user for development');
+      const mockUser: User = {
+        id: 'mock-user-123',
+        name: 'Demo User',
+        email: 'demo@foodietrust.com',
+        avatar: 'https://placehold.co/64x64/FF5733/FFFFFF?text=DU',
+        preferences: {
+          cuisines: ['Indian', 'Italian'],
+          dietaryRestrictions: [],
+          spiceLevel: 'medium',
+          budgetRange: [100, 500],
+          mealTimes: ['lunch', 'dinner'],
+          allergies: [],
+          preferredLanguage: 'en'
+        },
+        trustScore: 85,
+        reviewCount: 5,
+        joinDate: '2024-01-01',
+        location: 'Chennai, India',
+        favoriteRestaurants: [],
+        favoriteDishes: [],
+        reviewHistory: [],
+        isVerified: true,
+        loginMethod: 'email',
+        lastActive: new Date().toISOString(),
+        engagementScore: 75,
+        helpfulVotes: 12,
+        photosUploaded: 3,
+        followersCount: 25,
+        followingCount: 15,
+      };
+      setUser(mockUser);
+      setIsLoading(false);
+      return;
+    }
     const mapFirebaseToAppUser = async (firebaseUser: FirebaseUser): Promise<User> => {
       // Try Firestore users/{uid}
       const userRef = doc(db, 'users', firebaseUser.uid);
@@ -111,6 +148,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
+    if (!isFirebaseConfigured) {
+      console.log('🔥 Mock login for development');
+      return true; // Mock user is already set
+    }
+    
     setIsLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -135,6 +177,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const googleLogin = async (): Promise<boolean> => {
+    if (!isFirebaseConfigured) {
+      console.log('🔥 Mock Google login for development');
+      return true; // Mock user is already set
+    }
+    
     setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -160,6 +207,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (userData: RegisterData): Promise<boolean> => {
+    if (!isFirebaseConfigured) {
+      console.log('🔥 Mock register for development');
+      return true; // Mock user is already set
+    }
+    
     setIsLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, userData.email, userData.password);

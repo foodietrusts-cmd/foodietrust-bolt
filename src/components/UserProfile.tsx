@@ -3,9 +3,10 @@ import { User, Star, MapPin, Calendar, Shield, Edit3, Camera, Award, TrendingUp,
 import { useAuth } from '../contexts/AuthContext';
 import { getFirestore, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { isFirebaseConfigured } from '../lib/firebase';
 import type { Review } from '../types/types';
 
-const db = getFirestore(getApp());
+const db = isFirebaseConfigured ? getFirestore(getApp()) : null;
 
 interface UserProfileProps {
   isOpen: boolean;
@@ -26,6 +27,65 @@ export const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => 
       
       setIsLoadingReviews(true);
       try {
+        if (!isFirebaseConfigured || !db) {
+          // Mock reviews for development
+          const mockReviews: Review[] = [
+            {
+              id: 'mock-review-1',
+              userId: user.id,
+              userName: user.name,
+              userEmail: user.email,
+              userAvatar: user.avatar,
+              dishName: 'Chicken Biryani',
+              restaurantName: 'Paradise Restaurant',
+              rating: 5,
+              comment: 'Absolutely delicious! The spices were perfectly balanced and the chicken was tender.',
+              trustScore: 85,
+              date: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+              images: [],
+              helpful: 12,
+              verified: true,
+              userTrustScore: 85,
+              likes: 8,
+              isHelpful: false,
+              tags: ['Spicy', 'Authentic', 'Must-try'],
+              dishType: 'Biryani',
+              spiceLevel: 'medium',
+              portionSize: 'large',
+              visualAppeal: 4,
+              wouldRecommend: true,
+            },
+            {
+              id: 'mock-review-2',
+              userId: user.id,
+              userName: user.name,
+              userEmail: user.email,
+              userAvatar: user.avatar,
+              dishName: 'Masala Dosa',
+              restaurantName: 'Saravana Bhavan',
+              rating: 4,
+              comment: 'Great crispy dosa with flavorful potato filling. The coconut chutney was excellent.',
+              trustScore: 80,
+              date: new Date(Date.now() - 2 * 86400000).toISOString(), // 2 days ago
+              images: [],
+              helpful: 7,
+              verified: true,
+              userTrustScore: 85,
+              likes: 5,
+              isHelpful: false,
+              tags: ['Crispy', 'Traditional', 'South Indian'],
+              dishType: 'Dosa',
+              spiceLevel: 'mild',
+              portionSize: 'medium',
+              visualAppeal: 4,
+              wouldRecommend: true,
+            }
+          ];
+          setUserReviews(mockReviews);
+          setIsLoadingReviews(false);
+          return;
+        }
+        
         const reviewsRef = collection(db, 'reviews');
         const q = query(
           reviewsRef, 

@@ -1,9 +1,74 @@
-import { db } from './firebase';
+import { db, isFirebaseConfigured } from './firebase';
 import { collection, getDocs, query, orderBy, where, limit, addDoc } from 'firebase/firestore';
 import type { Dish, Review } from '../types/types';
 
 export const searchDishesInFirebase = async (searchQuery: string, location?: string): Promise<Dish[]> => {
   try {
+    if (!isFirebaseConfigured || !db) {
+      // Return mock search results for development
+      const mockDishes: Dish[] = [
+        {
+          id: 'firebase-dish-1',
+          name: 'Chettinad Chicken',
+          description: 'Spicy and aromatic chicken curry from Tamil Nadu with roasted spices',
+          image: 'https://placehold.co/400x300/FF5733/FFFFFF?text=Chettinad+Chicken',
+          price: 280,
+          cuisine: 'South Indian',
+          category: 'Main Course',
+          restaurant: {
+            id: 'rest-1',
+            name: 'Anjappar Chettinad',
+            location: 'Chennai'
+          },
+          averageRating: 4.5,
+          reviewCount: 45,
+          tags: ['Spicy', 'Authentic', 'Traditional'],
+          trustScore: 88,
+          photoCount: 12,
+          reviews: [],
+          credibilityScore: 85,
+          trendingScore: 75,
+          lastUpdated: new Date().toISOString()
+        },
+        {
+          id: 'firebase-dish-2',
+          name: 'Filter Coffee',
+          description: 'Traditional South Indian filter coffee with perfect blend of coffee and chicory',
+          image: 'https://placehold.co/400x300/8B4513/FFFFFF?text=Filter+Coffee',
+          price: 45,
+          cuisine: 'South Indian',
+          category: 'Beverages',
+          restaurant: {
+            id: 'rest-2',
+            name: 'Murugan Idli Shop',
+            location: 'Chennai'
+          },
+          averageRating: 4.8,
+          reviewCount: 123,
+          tags: ['Authentic', 'Traditional', 'Aromatic'],
+          trustScore: 92,
+          photoCount: 8,
+          reviews: [],
+          credibilityScore: 90,
+          trendingScore: 95,
+          lastUpdated: new Date().toISOString()
+        }
+      ];
+      
+      // Filter mock dishes based on search query
+      if (searchQuery.trim()) {
+        const searchLower = searchQuery.toLowerCase();
+        return mockDishes.filter(dish => 
+          dish.name.toLowerCase().includes(searchLower) ||
+          dish.description.toLowerCase().includes(searchLower) ||
+          dish.cuisine.toLowerCase().includes(searchLower) ||
+          dish.restaurant.name.toLowerCase().includes(searchLower) ||
+          dish.tags.some(tag => tag.toLowerCase().includes(searchLower))
+        );
+      }
+      
+      return mockDishes;
+    }
     const dishesRef = collection(db, 'dishes');
     let q = query(dishesRef, orderBy('name'), limit(50));
 

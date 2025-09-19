@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
 import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { isFirebaseConfigured } from '../lib/firebase';
 import '../lib/firebase';
 
-const db = getFirestore(getApp());
+const db = isFirebaseConfigured ? getFirestore(getApp()) : null;
 
 interface UserReviewsTabProps {
   onSubmitReview: (review: UserReviewSubmission) => Promise<boolean>;
@@ -24,6 +25,64 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
   useEffect(() => {
     const loadReviews = async () => {
       try {
+        if (!isFirebaseConfigured || !db) {
+          // Mock reviews for development
+          const mockReviews: Review[] = [
+            {
+              id: 'mock-1',
+              userId: 'mock-user-1',
+              userName: 'Priya Kumar',
+              userEmail: 'priya@example.com',
+              userAvatar: 'https://placehold.co/64x64/8B5CF6/FFFFFF?text=PK',
+              dishName: 'Butter Chicken',
+              restaurantName: 'Delhi Darbar',
+              rating: 5,
+              comment: 'Absolutely amazing! The creamy tomato sauce was perfectly balanced with aromatic spices.',
+              trustScore: 92,
+              date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+              images: [],
+              helpful: 15,
+              verified: true,
+              userTrustScore: 88,
+              likes: 12,
+              isHelpful: false,
+              tags: ['Creamy', 'Authentic', 'Must-try'],
+              dishType: 'Curry',
+              spiceLevel: 'medium',
+              portionSize: 'large',
+              visualAppeal: 5,
+              wouldRecommend: true,
+            },
+            {
+              id: 'mock-2',
+              userId: 'mock-user-2',
+              userName: 'Arjun Patel',
+              userEmail: 'arjun@example.com',
+              userAvatar: 'https://placehold.co/64x64/10B981/FFFFFF?text=AP',
+              dishName: 'Hyderabadi Biryani',
+              restaurantName: 'Bawarchi',
+              rating: 4,
+              comment: 'Good biryani with fragrant rice and tender mutton. Could use a bit more spice for my taste.',
+              trustScore: 85,
+              date: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+              images: [],
+              helpful: 8,
+              verified: false,
+              userTrustScore: 75,
+              likes: 6,
+              isHelpful: false,
+              tags: ['Aromatic', 'Traditional', 'Mutton'],
+              dishType: 'Biryani',
+              spiceLevel: 'medium',
+              portionSize: 'large',
+              visualAppeal: 4,
+              wouldRecommend: true,
+            }
+          ];
+          setReviews(mockReviews);
+          return;
+        }
+        
         const reviewsRef = collection(db, 'reviews');
         const q = query(reviewsRef, orderBy('timestamp', 'desc'));
         const snapshot = await getDocs(q);
@@ -333,8 +392,14 @@ const WriteReviewForm: React.FC<{
 
       let firebaseSaved = false;
       try {
-        await addDoc(collection(db, 'reviews'), reviewForFirestore);
-        firebaseSaved = true;
+        if (isFirebaseConfigured && db) {
+          await addDoc(collection(db, 'reviews'), reviewForFirestore);
+          firebaseSaved = true;
+          console.log('✅ Review saved to Firebase!', reviewForFirestore);
+        } else {
+          console.log('🔥 Mock mode: Review would be saved to Firebase:', reviewForFirestore);
+          firebaseSaved = true; // Simulate success in mock mode
+        }
       } catch (firebaseError) {
         // Keep UI flow intact; log Firebase error without interrupting existing submit behavior
         console.error('❌ Error saving review:', firebaseError);
