@@ -1,17 +1,4 @@
-[build]
+ [build]
   command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
-
-[[plugins]]
-  package = "@netlify/plugin-lighthouse"
-
-[[scheduled.functions]]
-  # Yelp crawler disabled (no key). Re-enable when YELP_API_KEY is available.
-  # name = "crawl-yelp"
-  # cron = "0 3 * * *"
-
-[[scheduled.functions]]
-  name = "crawl-google"
-  cron = "0 4 * * *" # daily 04:00 UTC
 
