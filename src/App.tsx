@@ -9,7 +9,7 @@ import { FilterPanel } from './components/FilterPanel';
 import { PersonalizedRecommendations } from './components/PersonalizedRecommendations';
 import { AuthModal } from './components/AuthModal';
 import { AIChat } from './components/AIChat';
-import { ReviewModal } from './components/ReviewModal';
+import ReviewModal from './components/ReviewModal';
 import { UserProfile } from './components/UserProfile';
 import { UserReviewsTab } from './components/UserReviewsTab';
 import { RestaurantPromotionsTab } from './components/RestaurantPromotionsTab';
