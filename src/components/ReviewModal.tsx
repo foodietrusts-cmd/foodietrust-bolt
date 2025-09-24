@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 import { doc, updateDoc, arrayUnion, serverTimestamp } from "firebase/firestore";
 
 interface ReviewModalProps {
@@ -9,7 +9,7 @@ interface ReviewModalProps {
   refreshRestaurant: () => Promise<void>;
 }
 
-const ReviewModal: React.FC<ReviewModalProps> = ({
+export const ReviewModal: React.FC<ReviewModalProps> = ({
   restaurantId,
   user,
   onClose,
@@ -85,4 +85,4 @@ const ReviewModal: React.FC<ReviewModalProps> = ({
   );
 };
 
-export default ReviewModal;
+
