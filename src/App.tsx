@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, MapPin, Star, TrendingUp, Clock, Users, Camera, Shield, Heart, ChefHat, Utensils, User, LogOut } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './components/Toast';
 import { TabNavigation } from './components/TabNavigation';
 import { SearchHeader } from './components/SearchHeader';
 import { DishCard } from './components/DishCard';
@@ -435,7 +436,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </AuthProvider>
   );
 }
