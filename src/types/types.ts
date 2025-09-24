@@ -110,13 +110,19 @@ export interface Restaurant {
 }
 
 export interface ReviewPost {
-  dishId: string;
+  restaurantId: string;
+  dishName: string;
+  reviewText: string;
   rating: number;
-  comment: string;
-  images?: File[];
   tags?: string[];
-  dishName?: string;
-  restaurantName?: string;
+  recommendation: boolean;
+  photoFile?: File | null;
+  extra?: {
+    tags: string[];
+    spiceLevel: 'mild' | 'medium' | 'hot' | 'extra-hot';
+    portionSize: 'small' | 'medium' | 'large';
+    wouldRecommend: boolean;
+  };
 }
 
 export interface UserReviewSubmission {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
 import { postReview } from '../lib/reviewService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ReviewModalProps {
   restaurantId: string;
@@ -8,6 +9,7 @@ interface ReviewModalProps {
 }
 
 export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
+  const { user } = useAuth();
   const [dishName, setDishName] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -19,6 +21,7 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
   const [enhancedComment, setEnhancedComment] = useState('');
   const [showEnhanced, setShowEnhanced] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const availableTags = [
@@ -59,6 +62,8 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
     if (rating === 0) {
       setError('Please select a rating');
       return;
@@ -67,22 +72,57 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
       setError('Review must be at least 20 characters');
       return;
     }
+    if (!dishName.trim()) {
+      setError('Please enter a dish name');
+      return;
+    }
 
     setIsSubmitting(true);
     setError('');
+    setSuccessMessage('');
 
     try {
       await postReview({
         restaurantId,
-        dishName,
+        dishName: dishName.trim(),
         reviewText: showEnhanced ? enhancedComment : comment.trim(),
         rating,
-        photoFile: images[0] || null, // ✅ keeping only first image for now (backend safe)
-        extra: { tags: selectedTags, spiceLevel, portionSize, wouldRecommend } // ✅ pass extra
+        tags: selectedTags,
+        recommendation: wouldRecommend,
+        photoFile: images[0] || null,
+        extra: { 
+          tags: selectedTags, 
+          spiceLevel, 
+          portionSize, 
+          wouldRecommend 
+        }
       });
-      onClose();
-    } catch {
-      setError('Failed to submit review');
+      
+      // Success: Reset form, show success message, and close modal
+      setSuccessMessage('Review submitted successfully!');
+      
+      // Reset form
+      setDishName('');
+      setRating(0);
+      setComment('');
+      setImages([]);
+      setSelectedTags([]);
+      setSpiceLevel('medium');
+      setPortionSize('medium');
+      setWouldRecommend(true);
+      setEnhancedComment('');
+      setShowEnhanced(false);
+      
+      // Close modal after a brief delay to show success message
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+      
+    } catch (error) {
+      // Show real Firebase error instead of generic message
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setError(errorMessage);
+      // Keep modal open on error
     } finally {
       setIsSubmitting(false);
     }
@@ -213,6 +253,7 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
           )}
 
           {error && <p className="text-red-500">{error}</p>}
+          {successMessage && <p className="text-green-500 font-medium">{successMessage}</p>}
 
           <button
             type="submit"
