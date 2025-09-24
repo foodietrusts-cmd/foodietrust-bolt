@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
 import { postReview } from '../lib/reviewService';
+import type { Dish } from '../types/types';
 
 interface ReviewModalProps {
-  restaurantId: string;
+  isOpen: boolean;
   onClose: () => void;
+  dish: Dish | null;
+  onSubmitReview: (review: any) => void;
 }
 
-export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
+export function ReviewModal({ isOpen, onClose, dish, onSubmitReview }: ReviewModalProps) {
   const [dishName, setDishName] = useState('');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -20,6 +23,9 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
   const [showEnhanced, setShowEnhanced] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Don't render if not open
+  if (!isOpen) return null;
 
   const availableTags = [
     'Spicy', 'Sweet', 'Savory', 'Crispy', 'Creamy', 'Fresh',
@@ -72,14 +78,17 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
     setError('');
 
     try {
-      await postReview({
-        restaurantId,
-        dishName,
+      const reviewData = {
+        dishId: dish?.id,
+        dishName: dishName || dish?.name,
         reviewText: showEnhanced ? enhancedComment : comment.trim(),
         rating,
-        photoFile: images[0] || null, // ✅ keeping only first image for now (backend safe)
-        extra: { tags: selectedTags, spiceLevel, portionSize, wouldRecommend } // ✅ pass extra
-      });
+        photoFile: images[0] || null,
+        extra: { tags: selectedTags, spiceLevel, portionSize, wouldRecommend }
+      };
+      
+      // Use the callback instead of direct API call
+      onSubmitReview(reviewData);
       onClose();
     } catch {
       setError('Failed to submit review');
