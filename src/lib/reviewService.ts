@@ -7,6 +7,7 @@ import type { ReviewPost } from '../types/types';
 const DEFAULT_AVATAR = 'https://placehold.co/64x64/FF5733/FFFFFF?text=U';
 
 export const postReview = async (review: ReviewPost) => {
+  // Check authentication first
   if (!auth.currentUser) {
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
@@ -30,32 +31,34 @@ export const postReview = async (review: ReviewPost) => {
     });
   }
 
+  // Handle photo upload if provided
   let photoURL: string | null = null;
-  const firstImage = (review.images && review.images[0]) || undefined;
-  if (firstImage) {
-    const storageRef = ref(storage, `reviews/${user.uid}/${firstImage.name}`);
-    await uploadBytes(storageRef, firstImage);
+  if (review.photoFile) {
+    const storageRef = ref(storage, `reviews/${user.uid}/${Date.now()}_${review.photoFile.name}`);
+    await uploadBytes(storageRef, review.photoFile);
     photoURL = await getDownloadURL(storageRef);
   }
 
+  // Create review document with all required fields
   const reviewDoc = {
+    restaurantId: review.restaurantId,
+    restaurantName: review.restaurantName,
+    dishName: review.dishName,
+    reviewText: review.reviewText,
+    rating: review.rating,
+    tags: review.tags || [],
+    recommendation: review.extra?.wouldRecommend || false,
+    photoURL,
+    createdAt: serverTimestamp(),
     userId: user.uid,
+    // Additional fields for compatibility and completeness
     userName: user.displayName || 'Anonymous User',
     userEmail: user.email || '',
     userAvatar: user.photoURL || DEFAULT_AVATAR,
-    dishName: review.dishName || '',
-    restaurantName: review.restaurantName || '',
-    rating: review.rating || 0,
-    comment: review.comment,
-    photoURL,
-    createdAt: serverTimestamp()
+    spiceLevel: review.extra?.spiceLevel || 'medium',
+    portionSize: review.extra?.portionSize || 'medium'
   };
 
-  // Save in top-level reviews for feed
+  // Save to reviews collection as specified in requirements
   await addDoc(collection(db, 'reviews'), reviewDoc);
-
-  // Also attach to a dish subcollection if dishId provided
-  if (review.dishId) {
-    await addDoc(collection(db, `dishes/${review.dishId}/reviews`), reviewDoc);
-  }
 };
