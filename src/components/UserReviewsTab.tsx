@@ -2,11 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Star, Camera, Search, Filter, TrendingUp, Heart, MessageSquare, MapPin, Clock, Award } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserReviewSubmission, Review } from '../types/types';
-import { getFirestore, collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
-import { getApp } from 'firebase/app';
-import '../lib/firebase';
-
-const db = getFirestore(getApp());
+import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface UserReviewsTabProps {
   onSubmitReview: (review: UserReviewSubmission) => Promise<boolean>;
@@ -24,6 +21,13 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
   useEffect(() => {
     const loadReviews = async () => {
       try {
+        if (!db) {
+          console.warn('Firebase not available - loading demo reviews');
+          // Load mock reviews for demo mode
+          setReviews([]);
+          return;
+        }
+        
         const reviewsRef = collection(db, 'reviews');
         const q = query(reviewsRef, orderBy('timestamp', 'desc'));
         const snapshot = await getDocs(q);
@@ -323,8 +327,12 @@ const WriteReviewForm: React.FC<{
 
       let firebaseSaved = false;
       try {
-        await addDoc(collection(db, 'reviews'), reviewForFirestore);
-        firebaseSaved = true;
+        if (db) {
+          await addDoc(collection(db, 'reviews'), reviewForFirestore);
+          firebaseSaved = true;
+        } else {
+          console.warn('Firebase not available - review will be saved to local storage');
+        }
       } catch (firebaseError) {
         // Keep UI flow intact; log Firebase error without interrupting existing submit behavior
         console.error('❌ Error saving review:', firebaseError);

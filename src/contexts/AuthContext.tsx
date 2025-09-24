@@ -37,6 +37,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Check if Firebase is available
+    if (!auth || !db) {
+      console.warn('Firebase not available - running in demo mode');
+      // Load saved user or use demo user
+      const savedUser = localStorage.getItem('foodietrust_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      } else {
+        // Create demo user for development
+        const demoUser: User = {
+          id: 'demo-user',
+          name: 'Demo User',
+          email: 'demo@foodietrust.com',
+          avatar: undefined,
+          preferences: {
+            cuisines: ['Italian', 'Indian'],
+            dietaryRestrictions: [],
+            spiceLevel: 'medium',
+            budgetRange: [100, 500],
+            mealTimes: ['lunch', 'dinner'],
+            allergies: [],
+            preferredLanguage: 'en'
+          },
+          trustScore: 80,
+          reviewCount: 5,
+          joinDate: '2024-01-01',
+          location: 'Demo City',
+          favoriteRestaurants: [],
+          favoriteDishes: [],
+          reviewHistory: [],
+          isVerified: true,
+          loginMethod: 'email',
+          lastActive: new Date().toISOString(),
+          engagementScore: 75,
+          helpfulVotes: 10,
+          photosUploaded: 3,
+          followersCount: 25,
+          followingCount: 15,
+        };
+        setUser(demoUser);
+        localStorage.setItem('foodietrust_user', JSON.stringify(demoUser));
+      }
+      setIsLoading(false);
+      return () => {}; // No cleanup needed for demo mode
+    }
+
     const mapFirebaseToAppUser = async (firebaseUser: FirebaseUser): Promise<User> => {
       // Try Firestore users/{uid}
       const userRef = doc(db, 'users', firebaseUser.uid);
@@ -113,6 +159,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
+      if (!auth || !db) {
+        console.warn('Firebase not available - simulating login');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        return true; // Simulate successful login in demo mode
+      }
+      
       const cred = await signInWithEmailAndPassword(auth, email, password);
       // Ensure users/{uid} exists
       const userRef = doc(db, 'users', cred.user.uid);
@@ -137,6 +189,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const googleLogin = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
+      if (!auth || !db) {
+        console.warn('Firebase not available - simulating Google login');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        return true; // Simulate successful login in demo mode
+      }
+      
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
@@ -162,6 +220,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: RegisterData): Promise<boolean> => {
     setIsLoading(true);
     try {
+      if (!auth || !db) {
+        console.warn('Firebase not available - simulating registration');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        return true; // Simulate successful registration in demo mode
+      }
+      
       const cred = await createUserWithEmailAndPassword(auth, userData.email, userData.password);
       const userRef = doc(db, 'users', cred.user.uid);
       await setDoc(userRef, {
@@ -180,6 +244,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    if (!auth) {
+      console.warn('Firebase not available - simulating logout');
+      setUser(null);
+      localStorage.removeItem('foodietrust_user');
+      return;
+    }
+    
     signOut(auth).catch(() => void 0).finally(() => {
       setUser(null);
       localStorage.removeItem('foodietrust_user');
