@@ -111,6 +111,7 @@ export interface Restaurant {
 
 export interface ReviewPost {
   restaurantId: string;
+  restaurantName: string;
   dishName: string;
   reviewText: string;
   rating: number;

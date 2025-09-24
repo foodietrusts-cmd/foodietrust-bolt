@@ -2,15 +2,18 @@ import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
 import { postReview } from '../lib/reviewService';
 import { useAuth } from '../contexts/AuthContext';
+import type { Dish, ReviewPost } from '../types/types';
 
 interface ReviewModalProps {
-  restaurantId: string;
+  isOpen: boolean;
   onClose: () => void;
+  dish: Dish | null;
+  onSubmitReview: (reviewData: ReviewPost) => Promise<boolean>;
 }
 
-export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
+export function ReviewModal({ isOpen, onClose, dish, onSubmitReview }: ReviewModalProps) {
   const { user } = useAuth();
-  const [dishName, setDishName] = useState('');
+  const [dishName, setDishName] = useState(dish?.name || '');
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<File[]>([]);
@@ -23,6 +26,11 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Return early if modal is not open
+  if (!isOpen || !dish) {
+    return null;
+  }
 
   const availableTags = [
     'Spicy', 'Sweet', 'Savory', 'Crispy', 'Creamy', 'Fresh',
@@ -82,8 +90,10 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
     setSuccessMessage('');
 
     try {
+      // Call the direct Firebase function for proper storage
       await postReview({
-        restaurantId,
+        restaurantId: dish.restaurant.id,
+        restaurantName: dish.restaurant.name,
         dishName: dishName.trim(),
         reviewText: showEnhanced ? enhancedComment : comment.trim(),
         rating,
@@ -102,7 +112,7 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
       setSuccessMessage('Review submitted successfully!');
       
       // Reset form
-      setDishName('');
+      setDishName(dish.name || '');
       setRating(0);
       setComment('');
       setImages([]);

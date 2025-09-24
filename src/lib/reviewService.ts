@@ -42,6 +42,7 @@ export const postReview = async (review: ReviewPost) => {
   // Create review document with all required fields
   const reviewDoc = {
     restaurantId: review.restaurantId,
+    restaurantName: review.restaurantName,
     dishName: review.dishName,
     reviewText: review.reviewText,
     rating: review.rating,
