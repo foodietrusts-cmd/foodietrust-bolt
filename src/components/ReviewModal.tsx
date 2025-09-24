@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Star, Camera, Tag, Sparkles, ThumbsUp } from 'lucide-react';
 import { postReview } from '../lib/reviewService';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from './Toast';
 
 interface ReviewModalProps {
   restaurantId: string;
@@ -21,10 +23,27 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
+
   const availableTags = [
     'Spicy', 'Sweet', 'Savory', 'Crispy', 'Creamy', 'Fresh',
     'Trending', 'Must-try', 'Healthy', 'Authentic'
   ];
+
+  const resetForm = () => {
+    setDishName('');
+    setRating(0);
+    setComment('');
+    setImages([]);
+    setSelectedTags([]);
+    setSpiceLevel('medium');
+    setPortionSize('medium');
+    setWouldRecommend(true);
+    setEnhancedComment('');
+    setShowEnhanced(false);
+    setError('');
+  };
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev =>
@@ -59,12 +78,24 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check authentication first
+    if (!user) {
+      setError('Please sign in to submit a review');
+      showError('Please sign in to submit a review');
+      return;
+    }
+
     if (rating === 0) {
       setError('Please select a rating');
       return;
     }
     if (comment.trim().length < 20) {
       setError('Review must be at least 20 characters');
+      return;
+    }
+    if (dishName.trim().length < 2) {
+      setError('Please enter a dish name');
       return;
     }
 
@@ -74,15 +105,25 @@ export function ReviewModal({ restaurantId, onClose }: ReviewModalProps) {
     try {
       await postReview({
         restaurantId,
-        dishName,
+        dishName: dishName.trim(),
         reviewText: showEnhanced ? enhancedComment : comment.trim(),
         rating,
-        photoFile: images[0] || null, // ✅ keeping only first image for now (backend safe)
-        extra: { tags: selectedTags, spiceLevel, portionSize, wouldRecommend } // ✅ pass extra
+        photoFile: images[0] || null,
+        extra: { tags: selectedTags, spiceLevel, portionSize, wouldRecommend }
       });
+      
+      // Success: close modal, reset form, and show success message
+      showSuccess('Review submitted successfully!');
+      resetForm();
       onClose();
-    } catch {
-      setError('Failed to submit review');
+    } catch (error) {
+      console.error('❌ Error submitting review:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to submit review. Please try again.';
+      setError(errorMessage);
+      showError(errorMessage);
+      // Keep the modal open so user can retry
     } finally {
       setIsSubmitting(false);
     }
