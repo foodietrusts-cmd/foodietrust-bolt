@@ -91,7 +91,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       const reviewData: ReviewPost = {
         dishId: dish.id,
         rating,
-        comment: showEnhanced ? enhancedComment : comment.trim(),
+        
         images: images.length > 0 ? images : undefined,
         tags: selectedTags,
         dishName: dish.name,
