@@ -1,10 +1,10 @@
 import React from 'react';
-import { Search, MessageSquare, Sparkles, BarChart3 } from 'lucide-react';
+import { Search, MessageSquare, Sparkles, BarChart3, Bot } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface TabNavigationProps {
-  activeTab: 'discover' | 'reviews' | 'promotions' | 'analytics';
-  onTabChange: (tab: 'discover' | 'reviews' | 'promotions' | 'analytics') => void;
+  activeTab: 'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch';
+  onTabChange: (tab: 'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch') => void;
 }
 
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange }) => {
@@ -29,6 +29,12 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
       icon: Sparkles,
       description: 'Restaurant specials'
     },
+    {
+      id: 'aisearch' as const,
+      label: 'AI Search',
+      icon: Bot,
+      description: 'Smart food finder'
+    },
     ...(user ? [{
       id: 'analytics' as const,
       label: 'Analytics',
@@ -45,6 +51,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
       if (tab.id === 'analytics') {
         return `${baseStyles} border-purple-500 text-purple-600`;
       }
+      if (tab.id === 'aisearch') {
+        return `${baseStyles} border-blue-500 text-blue-600`;
+      }
       return `${baseStyles} border-orange-500 text-orange-600`;
     }
     
@@ -54,6 +63,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
   const getIconColor = (tab: typeof tabs[0]) => {
     if (activeTab === tab.id && tab.id === 'analytics') {
       return 'text-purple-600';
+    }
+    if (activeTab === tab.id && tab.id === 'aisearch') {
+      return 'text-blue-600';
     }
     return '';
   };
@@ -76,8 +88,8 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
                   <div className="font-semibold">{tab.label}</div>
                   <div className="text-xs opacity-75">{tab.description}</div>
                 </div>
-                {(tab.id === 'promotions' || tab.id === 'analytics') && (
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                {(tab.id === 'promotions' || tab.id === 'analytics' || tab.id === 'aisearch') && (
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${tab.id === 'aisearch' ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
                 )}
               </button>
             );

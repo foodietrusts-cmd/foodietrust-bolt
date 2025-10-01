@@ -16,12 +16,13 @@ import { RestaurantPromotionsTab } from './components/RestaurantPromotionsTab';
 import { AdBanner } from './components/AdBanner';
 import { RevenueAnalytics } from './components/RevenueAnalytics';
 import { EngagementPrompts, CommunityStats } from './components/EngagementPrompts';
+import { AISearch } from './components/AISearch';
 import { mockDishes } from './data/mockData';
 import type { Dish, FilterOptions, ReviewPost, UserReviewSubmission } from './types/types';
 
 function AppContent() {
   const [dishes, setDishes] = useState<Dish[]>(mockDishes);
-  const [activeTab, setActiveTab] = useState<'discover' | 'reviews' | 'promotions' | 'analytics'>('discover');
+  const [activeTab, setActiveTab] = useState<'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch'>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
     cuisine: [],
@@ -368,7 +369,6 @@ function AppContent() {
         {activeTab === 'reviews' && (
           <UserReviewsTab onSubmitReview={handleSubmitUserReview} />
         )}
-
         {activeTab === 'promotions' && (
           <RestaurantPromotionsTab />
         )}
@@ -376,12 +376,14 @@ function AppContent() {
         {activeTab === 'analytics' && user && (
           <RevenueAnalytics />
         )}
+
+        {activeTab === 'aisearch' && (
+          <AISearch />
+        )}
       </div>
 
       {/* AI Chat */}
       <AIChat dishes={dishes} onDishRecommend={handleDishRecommend} />
-
-      {/* Modals */}
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => {
