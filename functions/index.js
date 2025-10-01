@@ -60,14 +60,64 @@ function setCache(key, data) {
   }
 }
 
+async function getNearbyRestaurants(location, query) {
+  try {
+    const googleMapsKey = process.env.GOOGLE_MAPS_KEY || functions.config().googlemaps?.key;
+    if (!googleMapsKey) {
+      console.log("[Places API] No Google Maps key configured");
+      return null;
+    }
+
+    // Parse location (lat,lng)
+    const [lat, lng] = location.split(",").map(s => parseFloat(s.trim()));
+    if (!lat || !lng) return null;
+
+    // Extract food type from query
+    const foodType = query.toLowerCase().match(/\b(biryani|pizza|sushi|burger|pasta|tacos|chinese|indian|italian|thai|mexican)\b/)?.[0] || "restaurant";
+
+    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=5000&keyword=${foodType}&type=restaurant&key=${googleMapsKey}`;
+    
+    const response = await http.get(url);
+    const places = response.data.results?.slice(0, 5) || [];
+    
+    if (places.length === 0) return null;
+
+    return places.map(place => ({
+      name: place.name,
+      address: place.vicinity,
+      rating: place.rating || "N/A",
+      userRatings: place.user_ratings_total || 0,
+      isOpen: place.opening_hours?.open_now ? "Open now" : "Closed",
+    }));
+  } catch (err) {
+    console.error("[Places API] Error:", err.message);
+    return null;
+  }
+}
+
 function sanitizePrompt(query, extras = {}) {
   const base = typeof query === "string" ? query.trim() : "";
   const location = typeof extras.location === "string" ? extras.location.trim() : "";
   const extraContext = typeof extras.context === "string" ? extras.context.trim() : "";
+  const nearbyPlaces = extras.nearbyPlaces;
 
   let prompt = base;
-  if (location) prompt += `\n\nUser location/context: ${location}`;
+  
+  if (nearbyPlaces && nearbyPlaces.length > 0) {
+    prompt += `\n\nHere are the top nearby restaurants based on the user's location:\n`;
+    nearbyPlaces.forEach((place, idx) => {
+      prompt += `\n${idx + 1}. **${place.name}**`;
+      prompt += `\n   - Address: ${place.address}`;
+      prompt += `\n   - Rating: ${place.rating}/5 (${place.userRatings} reviews)`;
+      prompt += `\n   - Status: ${place.isOpen}`;
+    });
+    prompt += `\n\nPlease provide a detailed recommendation based on these actual nearby restaurants. Include specific names, addresses, and why each is recommended.`;
+  } else if (location) {
+    prompt += `\n\nUser location: ${location}`;
+  }
+  
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
+  
   return prompt;
 }
 
@@ -219,6 +269,17 @@ exports.aiMultiProvider = functions
       if (cachedResult) {
         console.log("[aiMultiProvider] Returning cached result");
         return { ...cachedResult, cached: true };
+      }
+
+      // Get nearby restaurants if location is provided
+      let nearbyPlaces = null;
+      if (extras.location && extras.location.includes(",")) {
+        console.log("[aiMultiProvider] Fetching nearby restaurants...");
+        nearbyPlaces = await getNearbyRestaurants(extras.location, query);
+        if (nearbyPlaces) {
+          console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
+          extras.nearbyPlaces = nearbyPlaces;
+        }
       }
 
       const models = {
