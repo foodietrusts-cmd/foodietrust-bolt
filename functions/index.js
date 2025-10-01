@@ -11,9 +11,9 @@ const runtimeOptions = {
 };
 
 const DEFAULT_MODELS = {
-  GoogleAI: "gemini-1.5-flash",
+  GoogleAI: "gemini-1.5-flash-latest",
   OpenRouter: "meta-llama/llama-3.1-70b-instruct",
-  Groq: "llama-3.1-70b-versatile",
+  Groq: "llama-3.1-8b-instant",
   Mistral: "mistral-large-latest",
   Cerebras: "llama3.1-70b",
   HuggingFace: "mistralai/Mixtral-8x7B-Instruct-v0.1",
@@ -23,6 +23,42 @@ const DEFAULT_MODELS = {
 const http = axios.create({
   timeout: 20000,
 });
+
+// Simple in-memory cache (resets on cold start)
+const cache = new Map();
+const CACHE_TTL = 3600000; // 1 hour in milliseconds
+
+function getCacheKey(query, location) {
+  return `${query.toLowerCase().trim()}_${(location || "").toLowerCase().trim()}`;
+}
+
+function getFromCache(key) {
+  const cached = cache.get(key);
+  if (!cached) return null;
+  
+  const now = Date.now();
+  if (now - cached.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  
+  console.log("[Cache] HIT for key:", key);
+  return cached.data;
+}
+
+function setCache(key, data) {
+  console.log("[Cache] SET for key:", key);
+  cache.set(key, {
+    data,
+    timestamp: Date.now(),
+  });
+  
+  // Limit cache size to 100 entries
+  if (cache.size > 100) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
+}
 
 function sanitizePrompt(query, extras = {}) {
   const base = typeof query === "string" ? query.trim() : "";
@@ -37,9 +73,10 @@ function sanitizePrompt(query, extras = {}) {
 
 // Provider Clients
 async function callGoogleAI(prompt, model) {
-  const key = functions.config().googleai?.key;
+  const key = process.env.GOOGLEAI_KEY || functions.config().googleai?.key;
+  console.log("[GoogleAI] Key exists:", !!key, "Key length:", key?.length);
   if (!key) throw new Error("Missing Google AI key");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
 
   const payload = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -52,7 +89,8 @@ async function callGoogleAI(prompt, model) {
 }
 
 async function callGroq(prompt, model) {
-  const key = functions.config().groq?.key;
+  const key = process.env.GROQ_KEY || functions.config().groq?.key;
+  console.log("[Groq] Key exists:", !!key, "Key length:", key?.length);
   if (!key) throw new Error("Missing Groq key");
   const url = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -73,41 +111,100 @@ async function callGroq(prompt, model) {
   return { provider: "Groq", result: text };
 }
 
+async function callOpenRouter(prompt, model) {
+  const key = process.env.OPENROUTER_KEY || functions.config().openrouter?.key;
+  console.log("[OpenRouter] Key exists:", !!key, "Key length:", key?.length);
+  if (!key) throw new Error("Missing OpenRouter key");
+  const url = "https://openrouter.ai/api/v1/chat/completions";
+
+  const payload = {
+    model,
+    messages: [{ role: "user", content: prompt }],
+  };
+
+  const res = await http.post(url, payload, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://foodietrusts.com",
+      "X-Title": "FoodieTrust AI Search",
+    },
+  });
+  const text = res?.data?.choices?.[0]?.message?.content || "";
+  if (!text) throw new Error("OpenRouter: Empty response");
+  return { provider: "OpenRouter", result: text };
+}
+
 async function tryProvidersInOrder(prompt, models) {
-  const attempts = [
-    async () => await callGoogleAI(prompt, models.GoogleAI),
-    async () => await callGroq(prompt, models.Groq),
-  ];
-
-  for (let i = 0; i < attempts.length; i++) {
-    try {
-      return await attempts[i]();
-    } catch (err) {
-      console.error(`[Provider ${i + 1} failed]`, {
-        message: err?.message,
-        stack: err?.stack,
-        responseStatus: err?.response?.status,
-        responseData: err?.response?.data,
-      });
-
-      const status = err?.response?.status;
-      const isNetwork = !!err.code;
-      if (status === 429 || status === 408 || isNetwork) {
-        continue;
-      }
-      continue;
-    }
+  const errors = [];
+  
+  // Try Google AI
+  try {
+    console.log("[Provider 1] Trying Google AI...");
+    const result = await callGoogleAI(prompt, models.GoogleAI);
+    console.log("[Provider 1] Google AI SUCCESS!");
+    return result;
+  } catch (err) {
+    const errorInfo = {
+      provider: "GoogleAI",
+      message: err?.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      code: err?.code,
+    };
+    console.error("[Provider 1] Google AI FAILED:", JSON.stringify(errorInfo));
+    errors.push(errorInfo);
   }
 
-  throw new Error("All providers failed.");
+  // Try Groq
+  try {
+    console.log("[Provider 2] Trying Groq...");
+    const result = await callGroq(prompt, models.Groq);
+    console.log("[Provider 2] Groq SUCCESS!");
+    return result;
+  } catch (err) {
+    const errorInfo = {
+      provider: "Groq",
+      message: err?.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      code: err?.code,
+    };
+    console.error("[Provider 2] Groq FAILED:", JSON.stringify(errorInfo));
+    errors.push(errorInfo);
+  }
+
+  // Try OpenRouter (if key available)
+  try {
+    console.log("[Provider 3] Trying OpenRouter...");
+    const result = await callOpenRouter(prompt, models.OpenRouter);
+    console.log("[Provider 3] OpenRouter SUCCESS!");
+    return result;
+  } catch (err) {
+    const errorInfo = {
+      provider: "OpenRouter",
+      message: err?.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      code: err?.code,
+    };
+    console.error("[Provider 3] OpenRouter FAILED:", JSON.stringify(errorInfo));
+    errors.push(errorInfo);
+  }
+
+  console.error("[All providers failed]", JSON.stringify(errors));
+  throw new Error("All providers failed. Errors: " + JSON.stringify(errors));
 }
 
 exports.aiMultiProvider = functions
   .runWith(runtimeOptions)
   .https.onCall(async (data, context) => {
+    console.log("[aiMultiProvider] Request received:", { query: data?.query });
+    
     try {
       const query = data?.query;
       if (typeof query !== "string" || !query.trim()) {
+        console.error("[aiMultiProvider] Invalid query:", query);
         throw new functions.https.HttpsError("invalid-argument", "Field 'query' is required and must be a non-empty string.");
       }
 
@@ -116,23 +213,38 @@ exports.aiMultiProvider = functions
         context: data?.context,
       };
 
+      // Check cache first
+      const cacheKey = getCacheKey(query, extras.location);
+      const cachedResult = getFromCache(cacheKey);
+      if (cachedResult) {
+        console.log("[aiMultiProvider] Returning cached result");
+        return { ...cachedResult, cached: true };
+      }
+
       const models = {
         GoogleAI: data?.models?.GoogleAI || DEFAULT_MODELS.GoogleAI,
         Groq: data?.models?.Groq || DEFAULT_MODELS.Groq,
+        OpenRouter: data?.models?.OpenRouter || DEFAULT_MODELS.OpenRouter,
       };
 
       const prompt = sanitizePrompt(query, extras);
+      console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 100));
+      
       const result = await tryProvidersInOrder(prompt, models);
-
+      console.log("[aiMultiProvider] Success! Provider:", result.provider);
+      
+      // Cache the result
+      setCache(cacheKey, result);
+      
       return result;
     } catch (err) {
       console.error("[aiMultiProvider error]", {
         message: err?.message,
         stack: err?.stack,
         responseStatus: err?.response?.status,
-        responseData: err?.response?.data,
+        responseData: JSON.stringify(err?.response?.data),
       });
 
-      throw new functions.https.HttpsError("internal", "AI service temporarily unavailable. Please try again.");
+      throw new functions.https.HttpsError("internal", "AI service temporarily unavailable: " + err.message);
     }
   });

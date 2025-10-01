@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Search, Sparkles, Loader2, AlertCircle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search, Sparkles, Loader2, AlertCircle, MapPin, Zap } from "lucide-react";
 import { aiMultiProvider } from "../lib/firebase";
 
 interface AIResponse {
@@ -13,6 +13,25 @@ export const AISearch: React.FC = () => {
   const [provider, setProvider] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<string>("");
+  const [cached, setCached] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+
+  // Detect user location on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      setDetectingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLocation(`${position.coords.latitude},${position.coords.longitude}`);
+          setDetectingLocation(false);
+        },
+        () => {
+          setDetectingLocation(false);
+        }
+      );
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,15 +41,17 @@ export const AISearch: React.FC = () => {
     setError(null);
     setResult(null);
     setProvider(null);
+    setCached(false);
 
     try {
       const resp = await aiMultiProvider({
         query,
-        location: "Current location",
+        location: location || "Current location",
       });
-      const data = resp.data as AIResponse;
+      const data = resp.data as any;
       setProvider(data.provider);
       setResult(data.result);
+      setCached(data.cached || false);
     } catch (err: any) {
       setError(err?.message || "Request failed. Please try again.");
       console.error("AI Search Error:", err);
@@ -87,11 +108,21 @@ export const AISearch: React.FC = () => {
 
         {/* Provider Badge */}
         {provider && (
-          <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-green-700">
-              Powered by {provider}
-            </span>
+          <div className="mb-4 flex gap-2">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium text-green-700">
+                Powered by {provider}
+              </span>
+            </div>
+            {cached && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <Zap className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">
+                  Cached (Instant)
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -119,10 +150,20 @@ export const AISearch: React.FC = () => {
         )}
 
         {/* Info */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-sm text-blue-800">
-            <strong>Multi-Provider Fallback:</strong> This search automatically tries Google AI, OpenRouter, Groq, Mistral, Cerebras, HuggingFace, and Cohere in sequence until one succeeds.
-          </p>
+        <div className="mt-6 space-y-3">
+          {location && (
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-purple-600" />
+              <span className="text-sm text-purple-800">
+                <strong>Location detected:</strong> Using your location for better recommendations
+              </span>
+            </div>
+          )}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-sm text-blue-800">
+              <strong>Features:</strong> Multi-provider AI fallback (Google AI → Groq → OpenRouter), Smart caching (1-hour), Location-aware recommendations
+            </p>
+          </div>
         </div>
       </div>
     </div>
