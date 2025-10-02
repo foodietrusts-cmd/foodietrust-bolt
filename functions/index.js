@@ -191,12 +191,10 @@ ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some restaurants in ${loca
 
 Provide 3-5 restaurant recommendations specifically in ${location} with complete details.`;
   } else {
-    // No specific location - use general approach
+    // No specific location - provide general recommendations
     prompt = `Find the best restaurants that serve ${base}.
 
-${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
-
-Provide 3-5 restaurant recommendations with complete details.`;
+Provide 3-5 restaurant recommendations with complete details including names, addresses, ratings, and reviews. Focus on popular and highly-rated restaurants that serve ${base}.`;
   }
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
@@ -409,12 +407,12 @@ exports.aiMultiProvider = functions
       const foodPart = extractFoodFromQuery(dishQuery);
 
       const extras = {
-        location: location || data?.location,
+        location: location === "current" ? data?.location : location,
         context: data?.context,
       };
 
       // Check cache first
-      const cacheKey = getCacheKey(foodPart, extras.location);
+      const cacheKey = getCacheKey(foodPart, extras.location || "general");
       const cachedResult = getFromCache(cacheKey);
       if (cachedResult) {
         console.log("[aiMultiProvider] Returning cached result");
@@ -423,8 +421,8 @@ exports.aiMultiProvider = functions
 
       // Get nearby restaurants if location is provided (coordinates or location name)
       let nearbyPlaces = null;
-      if (extras.location && extras.location.includes(",") && !location) {
-        console.log("[aiMultiProvider] Fetching nearby restaurants for coordinates:", extras.location);
+      if (extras.location && extras.location.includes(",") && location === "current") {
+        console.log("[aiMultiProvider] Fetching nearby restaurants for user's coordinates:", extras.location);
         nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
         if (nearbyPlaces) {
           console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
@@ -460,28 +458,27 @@ exports.aiMultiProvider = functions
 
       // Return mock data even on error
       const fallbackFoodPart = extractFoodFromQuery(query);
-      const fallbackLocation = location && location.includes(",") ? "Round Rock, TX" : (location || "your area");
 
       return {
         provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation !== "your area" ? ` in ${fallbackLocation}` : ''}:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations:
 
 🍕 **${fallbackFoodPart} Palace**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Downtown Area
+📍 Multiple locations available
 ⭐ 4.5/5 (127 reviews)
-A local favorite restaurant serving authentic ${fallbackFoodPart}.
+A popular restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
 
 🍕 **${fallbackFoodPart} Corner**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Main Street
+📍 Various locations
 ⭐ 4.3/5 (89 reviews)
-Popular spot for delicious ${fallbackFoodPart}.
+Well-known spot for delicious ${fallbackFoodPart} options.
 
 🍕 **${fallbackFoodPart} Express**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Shopping District
+📍 Available nationwide
 ⭐ 4.2/5 (156 reviews)
-Great ${fallbackFoodPart} restaurant for a quick bite.
+Great ${fallbackFoodPart} restaurant with quick service.
 
-All locations are currently open!`
+All locations offer high-quality ${fallbackFoodPart}!`
       };
     }
   });
