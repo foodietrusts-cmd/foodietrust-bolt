@@ -128,7 +128,27 @@ export const AISearch: React.FC = () => {
       setResults(mockResults);
     } catch (err: any) {
       setError(err?.message || "Request failed. Please try again.");
-      console.error("AI Search Error:", err);
+
+      // Show fallback mock data when AI service fails
+      console.log("AI service failed, showing fallback data");
+      const fallbackResults: DishResult[] = [
+        {
+          dishName: query || "Popular Dish",
+          availableAt: [
+            {
+              restaurantName: "Local Restaurant",
+              address: "Nearby Location",
+              rating: 4.0,
+              price: 2,
+              reviewCount: 50,
+              sources: { google: 4.0 }
+            }
+          ],
+          aggregatedRating: 4.0,
+          totalReviews: 50
+        }
+      ];
+      setResults(fallbackResults);
     } finally {
       setLoading(false);
     }
