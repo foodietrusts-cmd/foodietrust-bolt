@@ -158,10 +158,9 @@ function sanitizePrompt(query, extras = {}) {
 
   let prompt = `Find the best restaurants that serve ${base}. I need ACTUAL restaurant recommendations based on the user's REAL location.
 
-CRITICAL: The user has provided their exact coordinates in the format "latitude,longitude". These coordinates represent their CURRENT LOCATION. You MUST use these coordinates to find restaurants within 10-15 miles of this exact spot.
-
-${location && location.includes(",") ? `USER COORDINATES: ${location}
-This is the user's exact location. Find restaurants NEAR these coordinates, not in other cities or states.` : ''}
+CRITICAL: The user has provided their exact coordinates in the format "latitude,longitude" (like "30.2672,-97.7431"). These coordinates represent their CURRENT LOCATION. You MUST use these coordinates to find restaurants within 10-15 miles of this exact spot.
+${location && location.includes(",") ? `USER COORDINATES PROVIDED: ${location}
+This is the user's exact location in "latitude,longitude" format. Find restaurants NEAR these coordinates, not in other cities or states.` : ''}
 
 ${locationContext}
 
@@ -170,16 +169,17 @@ ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants fo
 IMPORTANT INSTRUCTIONS:
 - Use the provided coordinates to find LOCAL restaurants
 - Restaurant names and specific addresses
-- Star ratings and review counts  
+- Star ratings and review counts
 - Why each restaurant is recommended for ${base}
 - Focus ONLY on restaurants within 15 miles of the coordinates
 - Do NOT provide restaurants from California, New York, or other distant locations
-- Do NOT say "coordinates not provided" - they ARE provided
+- Do NOT say "coordinates not provided" - they ARE provided in "lat,lng" format
+- Do NOT ask for coordinates - use the ones provided
+- The coordinates are already provided - do not request them again
 
 Provide 3-5 restaurant recommendations with complete details. Make sure all restaurants are actually near the user's location.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
-
   return prompt;
 }
 
