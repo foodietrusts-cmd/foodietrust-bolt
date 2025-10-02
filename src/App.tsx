@@ -22,7 +22,7 @@ import type { Dish, FilterOptions, ReviewPost, UserReviewSubmission } from './ty
 
 function AppContent() {
   const [dishes, setDishes] = useState<Dish[]>(mockDishes);
-  const [activeTab, setActiveTab] = useState<'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch'>('discover');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'promotions' | 'analytics' | 'aisearch'>('reviews');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
     cuisine: [],
@@ -197,7 +197,7 @@ function AppContent() {
         setShowAuthModal(true);
         break;
       case 'explore':
-        setActiveTab('discover');
+        setActiveTab('aisearch');
         break;
     }
   };
@@ -267,7 +267,7 @@ function AppContent() {
       <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Top Ad Banner */}
-      {activeTab === 'discover' && (
+      {activeTab === 'aisearch' && (
         <div className="max-w-7xl mx-auto px-4 pt-6">
           <AdBanner 
             placement="top" 
@@ -279,7 +279,7 @@ function AppContent() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Tab Content */}
-        {activeTab === 'discover' && (
+        {activeTab === 'aisearch' && (
           <>
             {/* Search Section */}
             <SearchHeader 

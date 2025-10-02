@@ -3,20 +3,14 @@ import { Search, MessageSquare, Sparkles, BarChart3, Bot } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface TabNavigationProps {
-  activeTab: 'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch';
-  onTabChange: (tab: 'discover' | 'reviews' | 'promotions' | 'analytics' | 'aisearch') => void;
+  activeTab: 'reviews' | 'promotions' | 'analytics' | 'aisearch';
+  onTabChange: (tab: 'reviews' | 'promotions' | 'analytics' | 'aisearch') => void;
 }
 
 export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabChange }) => {
   const { user } = useAuth();
 
   const tabs = [
-    {
-      id: 'discover' as const,
-      label: 'Discover',
-      icon: Search,
-      description: 'Find amazing dishes'
-    },
     {
       id: 'reviews' as const,
       label: 'Reviews',

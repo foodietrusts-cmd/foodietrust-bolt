@@ -144,8 +144,8 @@ export const AISearch: React.FC = () => {
           </button>
         </form>
 
-        {/* Provider Badge */}
-        {provider && (
+        {/* Provider Badge - Hidden for now */}
+        {/* {provider && (
           <div className="mb-4 flex gap-2">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -162,7 +162,7 @@ export const AISearch: React.FC = () => {
               </div>
             )}
           </div>
-        )}
+        )} */}
 
         {/* Result */}
         {result && (

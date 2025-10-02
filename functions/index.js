@@ -28,6 +28,22 @@ const http = axios.create({
 const cache = new Map();
 const CACHE_TTL = 3600000; // 1 hour in milliseconds
 
+// API Key validation and logging
+function validateApiKey(provider, key) {
+  if (!key) {
+    console.error(`[${provider}] API key missing or invalid`);
+    return false;
+  }
+
+  if (key.length < 10) {
+    console.error(`[${provider}] API key too short (length: ${key.length})`);
+    return false;
+  }
+
+  console.log(`[${provider}] API key validated (length: ${key.length})`);
+  return true;
+}
+
 function getCacheKey(query, location) {
   return `${query.toLowerCase().trim()}_${(location || "").toLowerCase().trim()}`;
 }
@@ -124,8 +140,8 @@ function sanitizePrompt(query, extras = {}) {
 // Provider Clients
 async function callGoogleAI(prompt, model) {
   const key = process.env.GOOGLEAI_KEY || functions.config().googleai?.key;
+  if (!validateApiKey("GoogleAI", key)) throw new Error("Missing or invalid Google AI key");
   console.log("[GoogleAI] Key exists:", !!key, "Key length:", key?.length);
-  if (!key) throw new Error("Missing Google AI key");
   const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
 
   const payload = {
@@ -140,8 +156,8 @@ async function callGoogleAI(prompt, model) {
 
 async function callGroq(prompt, model) {
   const key = process.env.GROQ_KEY || functions.config().groq?.key;
+  if (!validateApiKey("Groq", key)) throw new Error("Missing or invalid Groq key");
   console.log("[Groq] Key exists:", !!key, "Key length:", key?.length);
-  if (!key) throw new Error("Missing Groq key");
   const url = "https://api.groq.com/openai/v1/chat/completions";
 
   const payload = {
@@ -163,8 +179,8 @@ async function callGroq(prompt, model) {
 
 async function callOpenRouter(prompt, model) {
   const key = process.env.OPENROUTER_KEY || functions.config().openrouter?.key;
+  if (!validateApiKey("OpenRouter", key)) throw new Error("Missing or invalid OpenRouter key");
   console.log("[OpenRouter] Key exists:", !!key, "Key length:", key?.length);
-  if (!key) throw new Error("Missing OpenRouter key");
   const url = "https://openrouter.ai/api/v1/chat/completions";
 
   const payload = {
@@ -187,11 +203,17 @@ async function callOpenRouter(prompt, model) {
 
 async function tryProvidersInOrder(prompt, models) {
   const errors = [];
-  
+  const TIMEOUT_MS = 8000; // 8 seconds per provider
+
   // Try Google AI
   try {
     console.log("[Provider 1] Trying Google AI...");
-    const result = await callGoogleAI(prompt, models.GoogleAI);
+    const result = await Promise.race([
+      callGoogleAI(prompt, models.GoogleAI),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Google AI timeout")), TIMEOUT_MS)
+      )
+    ]);
     console.log("[Provider 1] Google AI SUCCESS!");
     return result;
   } catch (err) {
@@ -209,7 +231,12 @@ async function tryProvidersInOrder(prompt, models) {
   // Try Groq
   try {
     console.log("[Provider 2] Trying Groq...");
-    const result = await callGroq(prompt, models.Groq);
+    const result = await Promise.race([
+      callGroq(prompt, models.Groq),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Groq timeout")), TIMEOUT_MS)
+      )
+    ]);
     console.log("[Provider 2] Groq SUCCESS!");
     return result;
   } catch (err) {
@@ -227,7 +254,12 @@ async function tryProvidersInOrder(prompt, models) {
   // Try OpenRouter (if key available)
   try {
     console.log("[Provider 3] Trying OpenRouter...");
-    const result = await callOpenRouter(prompt, models.OpenRouter);
+    const result = await Promise.race([
+      callOpenRouter(prompt, models.OpenRouter),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("OpenRouter timeout")), TIMEOUT_MS)
+      )
+    ]);
     console.log("[Provider 3] OpenRouter SUCCESS!");
     return result;
   } catch (err) {
