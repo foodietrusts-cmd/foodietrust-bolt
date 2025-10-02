@@ -20,6 +20,10 @@ const DEFAULT_MODELS = {
   Cohere: "command-r",
 };
 
+const http = axios.create({
+  timeout: 20000,
+});
+
 // Location extraction from query
 function extractLocationFromQuery(query) {
   const locationPatterns = [
@@ -48,119 +52,6 @@ function isFoodRelatedQuery(query) {
     return false;
   }
   return true;
-}
-
-// Simple in-memory cache (resets on cold start)
-const cache = new Map();
-const CACHE_TTL = 3600000; // 1 hour in milliseconds
-
-// API Key validation and logging
-function validateApiKey(provider, key) {
-  if (!key) {
-    console.error(`[${provider}] API key missing or invalid`);
-    return false;
-  }
-
-  if (key.length < 10) {
-    console.error(`[${provider}] API key too short (length: ${key.length})`);
-    return false;
-  }
-
-  console.log(`[${provider}] API key validated (length: ${key.length})`);
-  return true;
-}
-
-function getCacheKey(query, location) {
-  return `${query.toLowerCase().trim()}_${(location || "").toLowerCase().trim()}`;
-}
-
-function getFromCache(key) {
-  const cached = cache.get(key);
-  if (!cached) return null;
-  
-  const now = Date.now();
-  if (now - cached.timestamp > CACHE_TTL) {
-    cache.delete(key);
-    return null;
-  }
-  
-  console.log("[Cache] HIT for key:", key);
-  return cached.data;
-}
-
-function setCache(key, data) {
-  console.log("[Cache] SET for key:", key);
-  cache.set(key, {
-    data,
-    timestamp: Date.now(),
-  });
-  
-  // Limit cache size to 100 entries
-  if (cache.size > 100) {
-    const firstKey = cache.keys().next().value;
-    cache.delete(firstKey);
-  }
-}
-
-async function getNearbyRestaurants(location, query) {
-  try {
-    const googleMapsKey = process.env.GOOGLE_MAPS_KEY || functions.config().googlemaps?.key;
-    if (!googleMapsKey) {
-      console.log("[Places API] No Google Maps key configured");
-      return null;
-    }
-
-    // Parse location (lat,lng)
-    const [lat, lng] = location.split(",").map(s => parseFloat(s.trim()));
-    if (!lat || !lng) return null;
-
-    // Extract food type from query
-    const foodType = query.toLowerCase().match(/\b(biryani|pizza|sushi|burger|pasta|tacos|chinese|indian|italian|thai|mexican)\b/)?.[0] || "restaurant";
-
-    const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=5000&keyword=${foodType}&type=restaurant&key=${googleMapsKey}`;
-    
-    const response = await http.get(url);
-    const places = response.data.results?.slice(0, 5) || [];
-    
-    if (places.length === 0) return null;
-
-    return places.map(place => ({
-      name: place.name,
-      address: place.vicinity,
-      rating: place.rating || "N/A",
-      userRatings: place.user_ratings_total || 0,
-      isOpen: place.opening_hours?.open_now ? "Open now" : "Closed",
-    }));
-  } catch (err) {
-    console.error("[Places API] Error:", err.message);
-    return null;
-  }
-}
-
-function sanitizePrompt(query, extras = {}) {
-  const base = typeof query === "string" ? query.trim() : "";
-  const location = typeof extras.location === "string" ? extras.location.trim() : "";
-  const extraContext = typeof extras.context === "string" ? extras.context.trim() : "";
-  const nearbyPlaces = extras.nearbyPlaces;
-
-  let prompt = base;
-  
-  if (nearbyPlaces && nearbyPlaces.length > 0) {
-    prompt += `\n\nHere are the top nearby restaurants based on the user's location:\n`;
-    nearbyPlaces.forEach((place, idx) => {
-      prompt += `\n${idx + 1}. **${place.name}**`;
-      prompt += `\n   - Address: ${place.address}`;
-      prompt += `\n   - Rating: ${place.rating}/5 (${place.userRatings} reviews)`;
-      prompt += `\n   - Status: ${place.isOpen}`;
-    });
-    prompt += `\n\nPlease provide a detailed recommendation based on these actual nearby restaurants. Include specific names, addresses, and why each is recommended.`;
-  } else if (location) {
-    prompt += `\n\nUser location: ${location}`;
-  }
-  
-  if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
-  
-  return prompt;
 }
 
 // Provider Clients
