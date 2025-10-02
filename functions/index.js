@@ -29,7 +29,8 @@ function extractLocationFromQuery(query) {
   const locationPatterns = [
     /in\s+([a-z\s,]+)$/i,
     /at\s+([a-z\s,]+)$/i,
-    /near\s+([a-z\s,]+)$/i
+    /near\s+([a-z\s,]+)$/i,
+    /around\s+([a-z\s,]+)$/i
   ];
 
   for (const pattern of locationPatterns) {
@@ -40,6 +41,13 @@ function extractLocationFromQuery(query) {
       return { location, dishQuery };
     }
   }
+
+  // Handle "near me" and similar cases
+  if (query.toLowerCase().includes('near me') || query.toLowerCase().includes('nearby')) {
+    const dishQuery = query.toLowerCase().replace(/near\s+me|nearby/g, '').trim();
+    return { location: "current", dishQuery };
+  }
+
   return { location: null, dishQuery: query };
 }
 
@@ -136,19 +144,31 @@ function sanitizePrompt(query, extras = {}) {
   const extraContext = typeof extras.context === "string" ? extras.context.trim() : "";
   const nearbyPlaces = extras.nearbyPlaces;
 
-  let prompt = `Find the best restaurants that serve ${base}. I need restaurant recommendations with specific locations, addresses, ratings, and reviews. Do NOT provide recipes or cooking instructions.
+  // Build location context
+  let locationContext = "";
+  if (location === "current") {
+    locationContext = "User's current location (use coordinates for nearby restaurant search)";
+  } else if (location && location.includes(",")) {
+    locationContext = `User location coordinates: ${location} (find restaurants near these coordinates)`;
+  } else if (location) {
+    locationContext = `User is located in: ${location}`;
+  } else {
+    locationContext = "Provide general restaurant recommendations";
+  }
 
-Focus on:
-- Restaurant names and addresses
-- Star ratings and review counts
-- Why each restaurant is recommended
-- Specific dishes they serve
+  let prompt = `Find the best restaurants that serve ${base}. Provide specific restaurant recommendations with names, addresses, ratings, and reviews.
 
-${location ? `User is located in: ${location}` : ''}
+${locationContext}
 
 ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
 
-Please provide restaurant recommendations, not recipes.`;
+Focus on:
+- Restaurant names and specific addresses
+- Star ratings and review counts
+- Why each restaurant is recommended for ${base}
+- Specific dishes they serve
+
+Provide 3-5 restaurant recommendations with complete details.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
 
@@ -373,15 +393,18 @@ exports.aiMultiProvider = functions
         return { ...cachedResult, cached: true };
       }
 
-      // Get nearby restaurants if location is provided
+      // Get nearby restaurants if location is provided (coordinates or location name)
       let nearbyPlaces = null;
       if (extras.location && extras.location.includes(",")) {
-        console.log("[aiMultiProvider] Fetching nearby restaurants...");
+        console.log("[aiMultiProvider] Fetching nearby restaurants for coordinates:", extras.location);
         nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
         if (nearbyPlaces) {
           console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
           extras.nearbyPlaces = nearbyPlaces;
         }
+      } else if (extras.location && extras.location !== "current") {
+        console.log("[aiMultiProvider] Using location name:", extras.location);
+        // For location names, we'll let the AI handle it in the prompt
       }
 
       const models = {
@@ -408,22 +431,24 @@ exports.aiMultiProvider = functions
 
       // Return mock data even on error
       const fallbackFoodPart = extractFoodFromQuery(query);
+      const fallbackLocation = location || "your area";
+
       return {
         provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation !== "your area" ? ` in ${fallbackLocation}` : ''}:
 
 🍕 **${fallbackFoodPart} Palace**
-📍 Downtown Area
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Downtown Area
 ⭐ 4.5/5 (127 reviews)
 A local favorite restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
 
 🍕 **${fallbackFoodPart} Corner**
-📍 Main Street
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Main Street
 ⭐ 4.3/5 (89 reviews)
 Popular spot for delicious ${fallbackFoodPart} options.
 
 🍕 **${fallbackFoodPart} Express**
-📍 Shopping District
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Shopping District
 ⭐ 4.2/5 (156 reviews)
 Great ${fallbackFoodPart} restaurant for a quick bite.
 
