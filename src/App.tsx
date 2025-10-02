@@ -288,6 +288,18 @@ function AppContent() {
         {activeTab === 'aisearch' && (
           <AISearch />
         )}
+
+        {activeTab === 'reviews' && (
+          <UserReviewsTab onSubmitReview={handleSubmitUserReview} />
+        )}
+
+        {activeTab === 'promotions' && (
+          <RestaurantPromotionsTab />
+        )}
+
+        {activeTab === 'analytics' && user && (
+          <RevenueAnalytics />
+        )}
       </div>
 
       {/* AI Chat */}
