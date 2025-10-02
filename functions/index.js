@@ -159,14 +159,14 @@ function sanitizePrompt(query, extras = {}) {
   }
 
   let prompt = "";
-  if (location && location.includes(",")) {
-    // User provided coordinates - use Round Rock context
+  if (location && location.includes(",") && location === "current") {
+    // User provided coordinates for "near me" search - use Round Rock context
     prompt = `Find the best restaurants that serve ${base} within a 5-10 mile radius of the provided coordinates.
 
-CRITICAL: The user has provided their exact coordinates: ${location}. This is their precise location in Round Rock, Texas area. You MUST find restaurants within 5-10 miles of these exact coordinates. Do NOT provide restaurants from Austin proper, downtown Austin, or other distant areas.
+CRITICAL: The user has provided their exact coordinates: ${extras.location}. This is their precise location in Round Rock, Texas area. You MUST find restaurants within 5-10 miles of these exact coordinates. Do NOT provide restaurants from Austin proper, downtown Austin, or other distant areas.
 
 IMPORTANT LOCATION DETAILS:
-- User's coordinates: ${location}
+- User's coordinates: ${extras.location}
 - This is Round Rock, TX area (north of Austin)
 - Search radius: MAXIMUM 10 miles from these coordinates
 - Do NOT include restaurants in Austin (78701, 78704, etc.)
@@ -181,20 +181,26 @@ STRICT GEOGRAPHIC BOUNDARIES:
 - All restaurants must be in Williamson County, TX
 
 Provide 3-5 restaurant recommendations in Round Rock area only.`;
-  } else if (location && location !== "current") {
+  } else if (location && location !== "current" && !location.includes(",")) {
     // User specified a named location
     prompt = `Find the best restaurants that serve ${base} in ${location}.
 
 IMPORTANT: The user is specifically searching for restaurants in ${location}, not their current location. Provide restaurant recommendations for ${location} only.
 
-${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some restaurants in ${location} to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
-
-Provide 3-5 restaurant recommendations specifically in ${location} with complete details.`;
+Provide 3-5 restaurant recommendations specifically in ${location} with complete details including names, addresses, ratings, and reviews.`;
   } else {
     // No specific location - provide general recommendations
     prompt = `Find the best restaurants that serve ${base}.
 
-Provide 3-5 restaurant recommendations with complete details including names, addresses, ratings, and reviews. Focus on popular and highly-rated restaurants that serve ${base}.`;
+IMPORTANT: This is a general search for ${base} restaurants. Provide popular and highly-rated restaurant recommendations that serve ${base}. Do not restrict to any specific location unless explicitly requested.
+
+Provide 3-5 restaurant recommendations with complete details including:
+- Restaurant names and addresses
+- Star ratings and review counts
+- Why each restaurant is recommended for ${base}
+- Specific dishes they serve
+
+Focus on well-known and popular restaurants that serve excellent ${base}.`;
   }
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
@@ -424,9 +430,11 @@ exports.aiMultiProvider = functions
       if (extras.location && extras.location.includes(",") && location === "current") {
         console.log("[aiMultiProvider] Fetching nearby restaurants for user's coordinates:", extras.location);
         nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
-        if (nearbyPlaces) {
-          console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
+        if (nearbyPlaces && nearbyPlaces.length > 0) {
+          console.log("[aiMultiProvider] Found", nearbyPlaces.length, "real nearby places");
           extras.nearbyPlaces = nearbyPlaces;
+        } else {
+          console.log("[aiMultiProvider] No nearby places found, using general recommendations");
         }
       } else if (extras.location && extras.location !== "current" && !extras.location.includes(",")) {
         console.log("[aiMultiProvider] Named location provided:", extras.location);
