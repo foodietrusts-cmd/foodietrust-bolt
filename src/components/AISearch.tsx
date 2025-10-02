@@ -30,54 +30,26 @@ export const AISearch: React.FC = () => {
   // Get trending dishes from mock data
   const trendingDishes = mockDishes.filter(dish => dish.tags.includes('Trending')).slice(0, 6);
 
-  // Detect user location on mount and retry if needed
+  // Detect user location on mount
   useEffect(() => {
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    const detectLocation = () => {
-      if (navigator.geolocation) {
-        console.log("Attempting to detect location...");
-        setLocationStatus("Detecting location...");
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const coords = `${position.coords.latitude},${position.coords.longitude}`;
-            console.log("✅ Location detected successfully:", coords);
-            setLocation(coords);
-            setLatLng({ lat: position.coords.latitude, lng: position.coords.longitude });
-            setLocationStatus(`📍 Location: ${coords}`);
-          },
-          (error) => {
-            console.error("❌ Location detection failed:", error);
-            setLocationStatus("❌ Location detection failed");
-            retryCount++;
-
-            if (retryCount < maxRetries) {
-              console.log(`Retrying location detection (${retryCount}/${maxRetries})...`);
-              setLocationStatus(`Retrying... (${retryCount}/${maxRetries})`);
-              setTimeout(detectLocation, 2000); // Retry after 2 seconds
-            } else {
-              console.log("Using default Round Rock coordinates after max retries");
-              setLocation("30.2672,-97.7431"); // Round Rock, Austin coordinates as default
-              setLatLng({ lat: 30.2672, lng: -97.7431 });
-              setLocationStatus("📍 Using default: Round Rock, TX");
-            }
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 15000, // Increased timeout
-            maximumAge: 60000 // 1 minute cache
-          }
-        );
-      } else {
-        console.log("❌ Geolocation not supported, using default");
-        setLocation("30.2672,-97.7431"); // Default to Round Rock, Austin
-        setLatLng({ lat: 30.2672, lng: -97.7431 });
-        setLocationStatus("📍 Using default: Round Rock, TX");
-      }
-    };
-
-    detectLocation();
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = `${position.coords.latitude},${position.coords.longitude}`;
+          console.log("Location detected:", coords);
+          setLocation(coords);
+          setLatLng({ lat: position.coords.latitude, lng: position.coords.longitude });
+        },
+        (error) => {
+          console.error("Location detection failed:", error);
+          // Location detection failed, use default location
+          setLocation("30.2672,-97.7431"); // Round Rock, Austin coordinates as default
+        }
+      );
+    } else {
+      console.log("Geolocation not supported");
+      setLocation("30.2672,-97.7431"); // Default to Round Rock, Austin
+    }
   }, []);
 
   const fetchSwiggyMenu = async (restaurantId: string) => {
@@ -115,82 +87,79 @@ export const AISearch: React.FC = () => {
     e.preventDefault();
     if (!query.trim()) return;
 
-    // Ensure we have location data before proceeding
-    if (!location) {
-      console.log("⏳ Waiting for location detection...");
-      // Give location detection a moment to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      if (!location) {
-        console.log("❌ No location detected, using default");
-        setLocation("30.2672,-97.7431"); // Round Rock coordinates
-      }
-    }
-
     setLoading(true);
     setError(null);
     setResults([]);
 
     try {
-      console.log("🚀 Submitting search with location:", location);
       const resp = await aiMultiProvider({
         query,
-        location: location ? {
-          lat: parseFloat(location.split(',')[0]),
-          lng: parseFloat(location.split(',')[1]),
-          city: 'Round Rock',
-          state: 'TX'
-        } : null,
+        location: location || "Current location",
       });
       const data = resp.data as any;
 
-      console.log("📥 Response received:", data);
-
-      // Check if there's an error
+      // Check if there's an error (like non-food query)
       if (data.error) {
-        if (data.needsLocation) {
-          setError("❌ Location access required. Please enable location services in your browser and refresh the page.");
-        } else {
-          setError(`❌ ${data.error}`);
-        }
+        setError(data.error);
         return;
       }
 
-      // Handle response data
-      if (data.response) {
-        console.log("✅ Got real restaurant data");
-        setResult(data.response);
-      } else if (typeof data.result === 'string') {
-        console.log("📋 Got text result");
+      // Handle both text format (from mock) and structured format (from real API)
+      if (typeof data.result === 'string') {
+        // Text format - show as formatted result
         setResult(data.result);
       } else {
-        console.log("📊 Got structured data");
-        setResults([data]);
+        // Structured format - use existing logic
+        const mockResults: DishResult[] = [
+          {
+            dishName: query,
+            availableAt: [
+              {
+                restaurantName: "Sample Restaurant 1",
+                address: "123 Main St, Sample City",
+                rating: 4.5,
+                price: 3,
+                reviewCount: 150,
+                sources: { google: 4.5 }
+              },
+              {
+                restaurantName: "Sample Restaurant 2",
+                address: "456 Oak Ave, Sample City",
+                rating: 4.2,
+                price: 2,
+                reviewCount: 89,
+                sources: { yelp: 4.2 }
+              }
+            ],
+            aggregatedRating: 4.35,
+            totalReviews: 239
+          }
+        ];
+        setResults(mockResults);
       }
-
-      console.log("✅ Search completed successfully");
     } catch (err: any) {
-      console.error("❌ Search failed:", err);
-      setError(`❌ ${err?.message || "Request failed. Please try again."}`);
+      setError(err?.message || "Request failed. Please try again.");
 
-      // Show fallback data when everything fails
-      console.log("🔄 Showing fallback data due to error");
-      setResult(`Here are some ${query} restaurant recommendations in Round Rock, TX:
-
-🍔 **Burger Palace**
-📍 Round Rock, TX - Downtown Area
-⭐ 4.5/5 (127 reviews)
-Popular spot for delicious burgers.
-
-🍔 **Burger Corner**
-📍 Round Rock, TX - Main Street
-⭐ 4.3/5 (89 reviews)
-Well-known for tasty burger options.
-
-🍔 **Burger Express**
-📍 Round Rock, TX - Shopping District
-⭐ 4.2/5 (156 reviews)
-Great burgers for a quick bite.`);
+      // Show fallback mock data when AI service fails
+      console.log("AI service failed, showing fallback data");
+      const fallbackResults: DishResult[] = [
+        {
+          dishName: query || "Popular Dish",
+          availableAt: [
+            {
+              restaurantName: "Local Restaurant",
+              address: "Nearby Location",
+              rating: 4.0,
+              price: 2,
+              reviewCount: 50,
+              sources: { google: 4.0 }
+            }
+          ],
+          aggregatedRating: 4.0,
+          totalReviews: 50
+        }
+      ];
+      setResults(fallbackResults);
     } finally {
       setLoading(false);
     }
