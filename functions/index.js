@@ -166,8 +166,38 @@ function isFoodRelatedQuery(query) {
   }
   return true;
 }
-// DISABLED: AI Provider functions - using mock data only
-/*
+
+// Extract food part from query (remove common prefixes/suffixes)
+function extractFoodFromQuery(query) {
+  let foodPart = query.toLowerCase();
+
+  // Remove common prefixes
+  const prefixes = ['best', 'top', 'good', 'great', 'delicious', 'tasty', 'amazing', 'find', 'show', 'recommend', 'suggest'];
+  prefixes.forEach(prefix => {
+    if (foodPart.startsWith(prefix + ' ')) {
+      foodPart = foodPart.substring(prefix.length + 1);
+    }
+  });
+
+  // Remove common suffixes
+  const suffixes = ['near me', 'nearby', 'around me', 'in my area'];
+  suffixes.forEach(suffix => {
+    if (foodPart.endsWith(' ' + suffix)) {
+      foodPart = foodPart.substring(0, foodPart.length - suffix.length - 1);
+    }
+  });
+
+  // Clean up extra spaces and return
+  foodPart = foodPart.trim();
+
+  // If nothing left or too short, return original
+  if (foodPart.length < 2) {
+    return query;
+  }
+
+  return foodPart;
+}
+// Provider Clients
 async function callGoogleAI(prompt, model) {
   const key = process.env.GOOGLEAI_KEY || functions.config().googleai?.key;
   if (!validateApiKey("GoogleAI", key)) throw new Error("Missing or invalid Google AI key");
@@ -233,8 +263,9 @@ async function callOpenRouter(prompt, model) {
 
 async function tryProvidersInOrder(prompt, models) {
   const errors = [];
-  const TIMEOUT_MS = 8000;
+  const TIMEOUT_MS = 8000; // 8 seconds per provider
 
+  // Try Google AI
   try {
     console.log("[Provider 1] Trying Google AI...");
     const result = await Promise.race([
@@ -257,6 +288,7 @@ async function tryProvidersInOrder(prompt, models) {
     errors.push(errorInfo);
   }
 
+  // Try Groq
   try {
     console.log("[Provider 2] Trying Groq...");
     const result = await Promise.race([
@@ -279,6 +311,7 @@ async function tryProvidersInOrder(prompt, models) {
     errors.push(errorInfo);
   }
 
+  // Try OpenRouter (if key available)
   try {
     console.log("[Provider 3] Trying OpenRouter...");
     const result = await Promise.race([
@@ -304,7 +337,6 @@ async function tryProvidersInOrder(prompt, models) {
   console.error("[All providers failed]", JSON.stringify(errors));
   throw new Error("All providers failed. Errors: " + JSON.stringify(errors));
 }
-*/
 
 exports.aiMultiProvider = functions
   .runWith(runtimeOptions)
@@ -326,30 +358,49 @@ exports.aiMultiProvider = functions
         return { error: 'Please search for food, dishes, or restaurants only' };
       }
 
-      // Return mock data immediately for now - no API calls
-      console.log("[aiMultiProvider] Returning mock data for:", dishQuery);
+      // Extract just the food part (remove common prefixes/suffixes)
+      const foodPart = extractFoodFromQuery(dishQuery);
 
-      return {
-        provider: "Mock",
-        result: `Here are some great ${dishQuery} recommendations${location ? ` in ${location}` : ''}:
-
-🍕 **${dishQuery} Palace**
-📍 ${location ? `${location}, ` : ''}Downtown Area
-⭐ 4.5/5 (127 reviews)
-A local favorite serving authentic ${dishQuery} with fresh ingredients and traditional recipes.
-
-🍕 **${dishQuery} Corner**
-📍 ${location ? `${location}, ` : ''}Main Street
-⭐ 4.3/5 (89 reviews)
-Cozy spot with quick service and delicious ${dishQuery} options for lunch or dinner.
-
-🍕 **${dishQuery} Express**
-📍 ${location ? `${location}, ` : ''}Shopping District
-⭐ 4.2/5 (156 reviews)
-Fast casual ${dishQuery} joint perfect for a quick bite with friends.
-
-All locations are currently open and ready to serve you!`
+      const extras = {
+        location: location || data?.location,
+        context: data?.context,
       };
+
+      // Check cache first
+      const cacheKey = getCacheKey(foodPart, extras.location);
+      const cachedResult = getFromCache(cacheKey);
+      if (cachedResult) {
+        console.log("[aiMultiProvider] Returning cached result");
+        return { ...cachedResult, cached: true };
+      }
+
+      // Get nearby restaurants if location is provided
+      let nearbyPlaces = null;
+      if (extras.location && extras.location.includes(",")) {
+        console.log("[aiMultiProvider] Fetching nearby restaurants...");
+        nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
+        if (nearbyPlaces) {
+          console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
+          extras.nearbyPlaces = nearbyPlaces;
+        }
+      }
+
+      const models = {
+        GoogleAI: data?.models?.GoogleAI || DEFAULT_MODELS.GoogleAI,
+        Groq: data?.models?.Groq || DEFAULT_MODELS.Groq,
+        OpenRouter: data?.models?.OpenRouter || DEFAULT_MODELS.OpenRouter,
+      };
+
+      const prompt = sanitizePrompt(foodPart, extras);
+      console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 100));
+
+      const result = await tryProvidersInOrder(prompt, models);
+      console.log("[aiMultiProvider] Success! Provider:", result.provider);
+
+      // Cache the result
+      setCache(cacheKey, result);
+
+      return result;
     } catch (err) {
       console.error("[aiMultiProvider error]", {
         message: err?.message,
@@ -357,11 +408,12 @@ All locations are currently open and ready to serve you!`
       });
 
       // Return mock data even on error
+      const fallbackFoodPart = extractFoodFromQuery(query);
       return {
         provider: "Mock",
-        result: `Great ${query} recommendations for you:
+        result: `Great ${fallbackFoodPart} recommendations for you:
 
-🍕 **Local ${query} Spot**
+🍕 **Local ${fallbackFoodPart} Spot**
 📍 Your Area
 ⭐ 4.4/5 (100 reviews)
 Delicious food with excellent service!`
