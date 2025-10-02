@@ -147,32 +147,36 @@ function sanitizePrompt(query, extras = {}) {
   // Build location context
   let locationContext = "";
   if (location === "current") {
-    locationContext = "User's current location coordinates provided. Use these coordinates to find restaurants within 10-15 miles of the user's location.";
+    locationContext = "User has enabled location services. Use their current coordinates to find nearby restaurants.";
   } else if (location && location.includes(",")) {
-    locationContext = `User location coordinates: ${location}. Find restaurants within 10-15 miles of these coordinates. Do not provide restaurants from other cities or states.`;
+    locationContext = `User coordinates provided: ${location}. This is their exact location - find restaurants within 10-15 miles of these coordinates.`;
   } else if (location) {
     locationContext = `User is located in: ${location}. Provide restaurant recommendations specifically for this location.`;
   } else {
-    locationContext = "Provide general restaurant recommendations from major cities.";
+    locationContext = "Provide general restaurant recommendations.";
   }
 
-  let prompt = `Find the best restaurants that serve ${base}. Provide specific restaurant recommendations with names, addresses, ratings, and reviews.
+  let prompt = `Find the best restaurants that serve ${base}. I need ACTUAL restaurant recommendations based on the user's REAL location.
 
-IMPORTANT: You are receiving user coordinates in the format "latitude,longitude". Use these coordinates to find restaurants within 10-15 miles of the user's exact location. Do NOT provide restaurants from California, New York, or other distant locations unless the coordinates indicate those areas.
+CRITICAL: The user has provided their exact coordinates in the format "latitude,longitude". These coordinates represent their CURRENT LOCATION. You MUST use these coordinates to find restaurants within 10-15 miles of this exact spot.
+
+${location && location.includes(",") ? `USER COORDINATES: ${location}
+This is the user's exact location. Find restaurants NEAR these coordinates, not in other cities or states.` : ''}
 
 ${locationContext}
 
-${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
+${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants found via Google Places API:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
 
-CRITICAL INSTRUCTIONS:
+IMPORTANT INSTRUCTIONS:
+- Use the provided coordinates to find LOCAL restaurants
 - Restaurant names and specific addresses
-- Star ratings and review counts
+- Star ratings and review counts  
 - Why each restaurant is recommended for ${base}
-- Specific dishes they serve
-- Focus ONLY on restaurants within 15 miles of the provided coordinates
-- Do NOT provide restaurants from California or other states unless coordinates indicate those locations
+- Focus ONLY on restaurants within 15 miles of the coordinates
+- Do NOT provide restaurants from California, New York, or other distant locations
+- Do NOT say "coordinates not provided" - they ARE provided
 
-Provide 3-5 restaurant recommendations with complete details. Each restaurant should be within reasonable driving distance of the user's location.`;
+Provide 3-5 restaurant recommendations with complete details. Make sure all restaurants are actually near the user's location.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
 
@@ -418,7 +422,8 @@ exports.aiMultiProvider = functions
       };
 
       const prompt = sanitizePrompt(foodPart, extras);
-      console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 100));
+      console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 200));
+      console.log("[aiMultiProvider] Location data:", { location: extras.location, nearbyPlaces: nearbyPlaces?.length || 0 });
 
       const result = await tryProvidersInOrder(prompt, models);
       console.log("[aiMultiProvider] Success! Provider:", result.provider);
