@@ -20,6 +20,7 @@ export const AISearch: React.FC = () => {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DishResult[]>([]);
+  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<string>("");
   const [swiggyMenu, setSwiggyMenu] = useState<SwiggyDish[] | null>(null);
@@ -97,35 +98,39 @@ export const AISearch: React.FC = () => {
         return;
       }
 
-      // For now, we'll use mock data until we integrate the data aggregator
-      // In the future, this would call the data aggregator function
-      const mockResults: DishResult[] = [
-        {
-          dishName: query,
-          availableAt: [
-            {
-              restaurantName: "Sample Restaurant 1",
-              address: "123 Main St, Sample City",
-              rating: 4.5,
-              price: 3,
-              reviewCount: 150,
-              sources: { google: 4.5 }
-            },
-            {
-              restaurantName: "Sample Restaurant 2",
-              address: "456 Oak Ave, Sample City",
-              rating: 4.2,
-              price: 2,
-              reviewCount: 89,
-              sources: { yelp: 4.2 }
-            }
-          ],
-          aggregatedRating: 4.35,
-          totalReviews: 239
-        }
-      ];
-
-      setResults(mockResults);
+      // Handle both text format (from mock) and structured format (from real API)
+      if (typeof data.result === 'string') {
+        // Text format - show as formatted result
+        setResult(data.result);
+      } else {
+        // Structured format - use existing logic
+        const mockResults: DishResult[] = [
+          {
+            dishName: query,
+            availableAt: [
+              {
+                restaurantName: "Sample Restaurant 1",
+                address: "123 Main St, Sample City",
+                rating: 4.5,
+                price: 3,
+                reviewCount: 150,
+                sources: { google: 4.5 }
+              },
+              {
+                restaurantName: "Sample Restaurant 2",
+                address: "456 Oak Ave, Sample City",
+                rating: 4.2,
+                price: 2,
+                reviewCount: 89,
+                sources: { yelp: 4.2 }
+              }
+            ],
+            aggregatedRating: 4.35,
+            totalReviews: 239
+          }
+        ];
+        setResults(mockResults);
+      }
     } catch (err: any) {
       setError(err?.message || "Request failed. Please try again.");
 
@@ -200,6 +205,18 @@ export const AISearch: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* Search Results - Show either text result or structured results */}
+        {result && (
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Found these amazing recommendations:</h3>
+            <div className="prose prose-sm max-w-none">
+              <pre className="whitespace-pre-wrap text-gray-700 font-sans leading-relaxed">
+                {result}
+              </pre>
+            </div>
+          </div>
+        )}
 
         {/* Search Results - Dish Centric Display */}
         {results.length > 0 && (
