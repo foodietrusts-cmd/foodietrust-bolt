@@ -147,28 +147,32 @@ function sanitizePrompt(query, extras = {}) {
   // Build location context
   let locationContext = "";
   if (location === "current") {
-    locationContext = "User's current location (use coordinates for nearby restaurant search)";
+    locationContext = "User's current location coordinates provided. Use these coordinates to find restaurants within 10-15 miles of the user's location.";
   } else if (location && location.includes(",")) {
-    locationContext = `User location coordinates: ${location} (find restaurants near these coordinates)`;
+    locationContext = `User location coordinates: ${location}. Find restaurants within 10-15 miles of these coordinates. Do not provide restaurants from other cities or states.`;
   } else if (location) {
-    locationContext = `User is located in: ${location}`;
+    locationContext = `User is located in: ${location}. Provide restaurant recommendations specifically for this location.`;
   } else {
-    locationContext = "Provide general restaurant recommendations";
+    locationContext = "Provide general restaurant recommendations from major cities.";
   }
 
   let prompt = `Find the best restaurants that serve ${base}. Provide specific restaurant recommendations with names, addresses, ratings, and reviews.
+
+IMPORTANT: You are receiving user coordinates in the format "latitude,longitude". Use these coordinates to find restaurants within 10-15 miles of the user's exact location. Do NOT provide restaurants from California, New York, or other distant locations unless the coordinates indicate those areas.
 
 ${locationContext}
 
 ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
 
-Focus on:
+CRITICAL INSTRUCTIONS:
 - Restaurant names and specific addresses
 - Star ratings and review counts
 - Why each restaurant is recommended for ${base}
 - Specific dishes they serve
+- Focus ONLY on restaurants within 15 miles of the provided coordinates
+- Do NOT provide restaurants from California or other states unless coordinates indicate those locations
 
-Provide 3-5 restaurant recommendations with complete details.`;
+Provide 3-5 restaurant recommendations with complete details. Each restaurant should be within reasonable driving distance of the user's location.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
 
