@@ -156,7 +156,16 @@ function sanitizePrompt(query, extras = {}) {
   return prompt;
 }
 
-// Provider Clients
+// Food-only content filtering
+function isFoodRelatedQuery(query) {
+  const nonFoodKeywords = ['movie', 'hotel', 'flight', 'booking', 'shop', 'electronics', 'clothes', 'phone', 'laptop', 'car', 'bus', 'train'];
+  const queryLower = query.toLowerCase();
+
+  if (nonFoodKeywords.some(kw => queryLower.includes(kw))) {
+    return false;
+  }
+  return true;
+}
 async function callGoogleAI(prompt, model) {
   const key = process.env.GOOGLEAI_KEY || functions.config().googleai?.key;
   if (!validateApiKey("GoogleAI", key)) throw new Error("Missing or invalid Google AI key");
