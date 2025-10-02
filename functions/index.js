@@ -166,6 +166,8 @@ function isFoodRelatedQuery(query) {
   }
   return true;
 }
+// DISABLED: AI Provider functions - using mock data only
+/*
 async function callGoogleAI(prompt, model) {
   const key = process.env.GOOGLEAI_KEY || functions.config().googleai?.key;
   if (!validateApiKey("GoogleAI", key)) throw new Error("Missing or invalid Google AI key");
@@ -231,9 +233,8 @@ async function callOpenRouter(prompt, model) {
 
 async function tryProvidersInOrder(prompt, models) {
   const errors = [];
-  const TIMEOUT_MS = 8000; // 8 seconds per provider
+  const TIMEOUT_MS = 8000;
 
-  // Try Google AI
   try {
     console.log("[Provider 1] Trying Google AI...");
     const result = await Promise.race([
@@ -256,7 +257,6 @@ async function tryProvidersInOrder(prompt, models) {
     errors.push(errorInfo);
   }
 
-  // Try Groq
   try {
     console.log("[Provider 2] Trying Groq...");
     const result = await Promise.race([
@@ -279,7 +279,6 @@ async function tryProvidersInOrder(prompt, models) {
     errors.push(errorInfo);
   }
 
-  // Try OpenRouter (if key available)
   try {
     console.log("[Provider 3] Trying OpenRouter...");
     const result = await Promise.race([
@@ -305,6 +304,7 @@ async function tryProvidersInOrder(prompt, models) {
   console.error("[All providers failed]", JSON.stringify(errors));
   throw new Error("All providers failed. Errors: " + JSON.stringify(errors));
 }
+*/
 
 exports.aiMultiProvider = functions
   .runWith(runtimeOptions)
