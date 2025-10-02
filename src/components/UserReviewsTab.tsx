@@ -323,6 +323,8 @@ const WriteReviewForm: React.FC<{
 
       // Create review object for Firestore
       const reviewForFirestore = {
+        userId: user?.id,
+        userName: user?.name,
         dishName: formData.dishName,
         restaurantName: formData.restaurantName,
         rating: formData.rating,
