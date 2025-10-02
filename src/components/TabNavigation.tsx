@@ -31,9 +31,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
     },
     {
       id: 'aisearch' as const,
-      label: 'AI Search',
+      label: 'Discover',
       icon: Bot,
-      description: 'Smart food finder'
+      description: 'Find amazing dishes'
     },
     ...(user ? [{
       id: 'analytics' as const,
