@@ -394,21 +394,24 @@ exports.aiMultiProvider = functions.https.onCall(async (data, context) => {
     const query = data.query;
     const userLocation = data.location;
 
-    // STEP 1: VALIDATE LOCATION
-    if (!userLocation?.lat || !userLocation?.lng) {
-      return {
-        error: 'Location required. Please enable location access.',
-        needsLocation: true
-      };
-    }
-
-    const locationString = `${userLocation.city}, ${userLocation.state}` ;
-    const coordinates = `${userLocation.lat},${userLocation.lng}` ;
-
     console.log('=== SEARCH REQUEST ===');
     console.log('Query:', query);
-    console.log('Location:', locationString);
-    console.log('Coordinates:', coordinates);
+    console.log('Location data received:', userLocation);
+
+    // STEP 1: VALIDATE LOCATION - with fallback
+    let locationString = 'Round Rock, TX';
+    let coordinates = '30.2672,-97.7431';
+
+    if (userLocation?.lat && userLocation?.lng) {
+      locationString = `${userLocation.city || 'Round Rock'}, ${userLocation.state || 'TX'}`;
+      coordinates = `${userLocation.lat},${userLocation.lng}`;
+      console.log('✅ Using provided location:', locationString);
+    } else {
+      console.log('⚠️ No location provided, using default Round Rock coordinates');
+    }
+
+    console.log('Final location string:', locationString);
+    console.log('Final coordinates:', coordinates);
 
     // STEP 2: EXTRACT DISH NAME
     const dishName = query
