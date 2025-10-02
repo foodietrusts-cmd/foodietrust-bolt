@@ -20,9 +20,35 @@ const DEFAULT_MODELS = {
   Cohere: "command-r",
 };
 
-const http = axios.create({
-  timeout: 20000,
-});
+// Location extraction from query
+function extractLocationFromQuery(query) {
+  const locationPatterns = [
+    /in\s+([a-z\s,]+)$/i,
+    /at\s+([a-z\s,]+)$/i,
+    /near\s+([a-z\s,]+)$/i
+  ];
+
+  for (const pattern of locationPatterns) {
+    const match = query.match(pattern);
+    if (match) {
+      const location = match[1].trim();
+      const dishQuery = query.replace(match[0], '').trim();
+      return { location, dishQuery };
+    }
+  }
+  return { location: null, dishQuery: query };
+}
+
+// Food-only content filtering
+function isFoodRelatedQuery(query) {
+  const nonFoodKeywords = ['movie', 'hotel', 'flight', 'booking', 'shop', 'electronics', 'clothes', 'phone', 'laptop', 'car', 'bus', 'train'];
+  const queryLower = query.toLowerCase();
+
+  if (nonFoodKeywords.some(kw => queryLower.includes(kw))) {
+    return false;
+  }
+  return true;
+}
 
 // Simple in-memory cache (resets on cold start)
 const cache = new Map();
@@ -282,7 +308,7 @@ exports.aiMultiProvider = functions
   .runWith(runtimeOptions)
   .https.onCall(async (data, context) => {
     console.log("[aiMultiProvider] Request received:", { query: data?.query });
-    
+
     try {
       const query = data?.query;
       if (typeof query !== "string" || !query.trim()) {
@@ -290,13 +316,21 @@ exports.aiMultiProvider = functions
         throw new functions.https.HttpsError("invalid-argument", "Field 'query' is required and must be a non-empty string.");
       }
 
+      // Extract location from query first
+      const { location, dishQuery } = extractLocationFromQuery(query);
+
+      // Check if query is food-related
+      if (!isFoodRelatedQuery(dishQuery)) {
+        return { error: 'Please search for food, dishes, or restaurants only' };
+      }
+
       const extras = {
-        location: data?.location,
+        location: location || data?.location,
         context: data?.context,
       };
 
       // Check cache first
-      const cacheKey = getCacheKey(query, extras.location);
+      const cacheKey = getCacheKey(dishQuery, extras.location);
       const cachedResult = getFromCache(cacheKey);
       if (cachedResult) {
         console.log("[aiMultiProvider] Returning cached result");
@@ -320,7 +354,7 @@ exports.aiMultiProvider = functions
         OpenRouter: data?.models?.OpenRouter || DEFAULT_MODELS.OpenRouter,
       };
 
-      const prompt = sanitizePrompt(query, extras);
+      const prompt = sanitizePrompt(dishQuery, extras);
       console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 100));
       
       const result = await tryProvidersInOrder(prompt, models);

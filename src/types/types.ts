@@ -222,13 +222,24 @@ export interface ReviewEngagement {
   shares: number;
 }
 
-export interface CommunityChallenge {
-  id: string;
-  title: string;
-  description: string;
-  type: 'photo' | 'review' | 'discovery';
-  reward: string;
-  participantCount: number;
-  endDate: string;
-  isActive: boolean;
+export interface DishResult {
+  dishName: string;
+  availableAt: RestaurantLocation[];
+  aggregatedRating: number;
+  totalReviews: number;
+  description?: string;
+}
+
+export interface RestaurantLocation {
+  restaurantName: string;
+  address: string;
+  rating: number;
+  price: number;
+  distance?: string;
+  reviewCount: number;
+  sources: {
+    google?: number;
+    zomato?: number;
+    yelp?: number;
+  };
 }
