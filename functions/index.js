@@ -153,20 +153,24 @@ function sanitizePrompt(query, extras = {}) {
   } else if (location && location.includes(",")) {
     locationContext = `User coordinates provided: ${location}. Find restaurants within 5-10 miles of these coordinates in Round Rock area only.`;
   } else if (location) {
-    locationContext = `User is located in: ${location}. Provide restaurant recommendations specifically for this location.`;
+    locationContext = `User is searching for restaurants in: ${location}. Provide restaurant recommendations specifically for ${location}, not the user's current location.`;
   } else {
     locationContext = "Provide general restaurant recommendations.";
   }
 
-  let prompt = `Find the best restaurants that serve ${base} in Round Rock, Texas - NOT Austin.
+  let prompt = "";
+  if (location && location.includes(",")) {
+    // User provided coordinates - use Round Rock context
+    prompt = `Find the best restaurants that serve ${base} within a 5-10 mile radius of the provided coordinates.
 
-CRITICAL LOCATION INFORMATION:
-- User's exact coordinates: ${location}
-- These coordinates are in ROUND ROCK, TX (zip code 78664)
-- This is 20 miles NORTH of Austin, TX
-- Do NOT provide restaurants from Austin (78701, 78704, etc.)
-- Search within 10 miles of these Round Rock coordinates only
-- Focus ONLY on Round Rock, Pflugerville, and Hutto areas
+CRITICAL: The user has provided their exact coordinates: ${location}. This is their precise location in Round Rock, Texas area. You MUST find restaurants within 5-10 miles of these exact coordinates. Do NOT provide restaurants from Austin proper, downtown Austin, or other distant areas.
+
+IMPORTANT LOCATION DETAILS:
+- User's coordinates: ${location}
+- This is Round Rock, TX area (north of Austin)
+- Search radius: MAXIMUM 10 miles from these coordinates
+- Do NOT include restaurants in Austin (78701, 78704, etc.)
+- Focus ONLY on restaurants in Round Rock, Pflugerville, or immediately adjacent areas
 
 ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants found via Google Places API:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
 
@@ -177,6 +181,23 @@ STRICT GEOGRAPHIC BOUNDARIES:
 - All restaurants must be in Williamson County, TX
 
 Provide 3-5 restaurant recommendations in Round Rock area only.`;
+  } else if (location && location !== "current") {
+    // User specified a named location
+    prompt = `Find the best restaurants that serve ${base} in ${location}.
+
+IMPORTANT: The user is specifically searching for restaurants in ${location}, not their current location. Provide restaurant recommendations for ${location} only.
+
+${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some restaurants in ${location} to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
+
+Provide 3-5 restaurant recommendations specifically in ${location} with complete details.`;
+  } else {
+    // No specific location - use general approach
+    prompt = `Find the best restaurants that serve ${base}.
+
+${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
+
+Provide 3-5 restaurant recommendations with complete details.`;
+  }
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
   return prompt;
@@ -402,16 +423,16 @@ exports.aiMultiProvider = functions
 
       // Get nearby restaurants if location is provided (coordinates or location name)
       let nearbyPlaces = null;
-      if (extras.location && extras.location.includes(",")) {
+      if (extras.location && extras.location.includes(",") && !location) {
         console.log("[aiMultiProvider] Fetching nearby restaurants for coordinates:", extras.location);
         nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
         if (nearbyPlaces) {
           console.log("[aiMultiProvider] Found", nearbyPlaces.length, "nearby places");
           extras.nearbyPlaces = nearbyPlaces;
         }
-      } else if (extras.location && extras.location !== "current") {
-        console.log("[aiMultiProvider] Using location name:", extras.location);
-        // For location names, we'll let the AI handle it in the prompt
+      } else if (extras.location && extras.location !== "current" && !extras.location.includes(",")) {
+        console.log("[aiMultiProvider] Named location provided:", extras.location);
+        // For named locations, don't fetch nearby places via coordinates
       }
 
       const models = {
@@ -439,28 +460,28 @@ exports.aiMultiProvider = functions
 
       // Return mock data even on error
       const fallbackFoodPart = extractFoodFromQuery(query);
-      const fallbackLocation = location || "Round Rock, TX";
+      const fallbackLocation = location && location.includes(",") ? "Round Rock, TX" : (location || "your area");
 
       return {
         provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations in ${fallbackLocation}:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation !== "your area" ? ` in ${fallbackLocation}` : ''}:
 
 🍕 **${fallbackFoodPart} Palace**
-📍 ${fallbackLocation} - Downtown Area
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Downtown Area
 ⭐ 4.5/5 (127 reviews)
-A local favorite restaurant in ${fallbackLocation} serving authentic ${fallbackFoodPart}.
+A local favorite restaurant serving authentic ${fallbackFoodPart}.
 
 🍕 **${fallbackFoodPart} Corner**
-📍 ${fallbackLocation} - Main Street
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Main Street
 ⭐ 4.3/5 (89 reviews)
-Popular spot in ${fallbackLocation} for delicious ${fallbackFoodPart}.
+Popular spot for delicious ${fallbackFoodPart}.
 
 🍕 **${fallbackFoodPart} Express**
-📍 Pflugerville, TX - Shopping District
+📍 ${fallbackLocation !== "your area" ? `${fallbackLocation} - ` : ''}Shopping District
 ⭐ 4.2/5 (156 reviews)
-Great ${fallbackFoodPart} restaurant near ${fallbackLocation}.
+Great ${fallbackFoodPart} restaurant for a quick bite.
 
-All locations are in the ${fallbackLocation} area!`
+All locations are currently open!`
       };
     }
   });
