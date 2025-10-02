@@ -136,20 +136,19 @@ function sanitizePrompt(query, extras = {}) {
   const extraContext = typeof extras.context === "string" ? extras.context.trim() : "";
   const nearbyPlaces = extras.nearbyPlaces;
 
-  let prompt = base;
+  let prompt = `Find the best restaurants that serve ${base}. I need restaurant recommendations with specific locations, addresses, ratings, and reviews. Do NOT provide recipes or cooking instructions.
 
-  if (nearbyPlaces && nearbyPlaces.length > 0) {
-    prompt += `\n\nHere are the top nearby restaurants based on the user's location:\n`;
-    nearbyPlaces.forEach((place, idx) => {
-      prompt += `\n${idx + 1}. **${place.name}**`;
-      prompt += `\n   - Address: ${place.address}`;
-      prompt += `\n   - Rating: ${place.rating}/5 (${place.userRatings} reviews)`;
-      prompt += `\n   - Status: ${place.isOpen}`;
-    });
-    prompt += `\n\nPlease provide a detailed recommendation based on these actual nearby restaurants. Include specific names, addresses, and why each is recommended.`;
-  } else if (location) {
-    prompt += `\n\nUser location: ${location}`;
-  }
+Focus on:
+- Restaurant names and addresses
+- Star ratings and review counts
+- Why each restaurant is recommended
+- Specific dishes they serve
+
+${location ? `User is located in: ${location}` : ''}
+
+${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants to consider:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
+
+Please provide restaurant recommendations, not recipes.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
 
@@ -411,12 +410,24 @@ exports.aiMultiProvider = functions
       const fallbackFoodPart = extractFoodFromQuery(query);
       return {
         provider: "Mock",
-        result: `Great ${fallbackFoodPart} recommendations for you:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations:
 
-🍕 **Local ${fallbackFoodPart} Spot**
-📍 Your Area
-⭐ 4.4/5 (100 reviews)
-Delicious food with excellent service!`
+🍕 **${fallbackFoodPart} Palace**
+📍 Downtown Area
+⭐ 4.5/5 (127 reviews)
+A local favorite restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
+
+🍕 **${fallbackFoodPart} Corner**
+📍 Main Street
+⭐ 4.3/5 (89 reviews)
+Popular spot for delicious ${fallbackFoodPart} options.
+
+🍕 **${fallbackFoodPart} Express**
+📍 Shopping District
+⭐ 4.2/5 (156 reviews)
+Great ${fallbackFoodPart} restaurant for a quick bite.
+
+All locations are currently open!`
       };
     }
   });
