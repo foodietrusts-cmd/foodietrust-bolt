@@ -24,5 +24,6 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 
-// Export callable function for AI search
+// Export callable functions
 export const aiMultiProvider = httpsCallable(functions, "aiMultiProvider");
+export const getSwiggyMenu = httpsCallable(functions, "getSwiggyMenu");

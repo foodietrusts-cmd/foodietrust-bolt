@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { Search, Sparkles, Loader2, AlertCircle, MapPin, Zap } from "lucide-react";
-import { aiMultiProvider } from "../lib/firebase";
+import { Search, Sparkles, Loader2, AlertCircle, MapPin, Zap, ChevronRight, Star, Utensils } from "lucide-react";
+import { aiMultiProvider, getSwiggyMenu } from "../lib/firebase";
 
 interface AIResponse {
   provider: string;
   result: string;
+}
+
+interface SwiggyDish {
+  id: string;
+  name: string;
+  price: number;
+  description: string;
+  isVeg: boolean;
+  rating: string | null;
+  ratingCount: string | null;
+  imageId: string | null;
+  category: string;
 }
 
 export const AISearch: React.FC = () => {
@@ -16,6 +28,10 @@ export const AISearch: React.FC = () => {
   const [location, setLocation] = useState<string>("");
   const [cached, setCached] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [swiggyMenu, setSwiggyMenu] = useState<SwiggyDish[] | null>(null);
+  const [loadingMenu, setLoadingMenu] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null);
+  const [latLng, setLatLng] = useState<{lat: number, lng: number} | null>(null);
 
   // Detect user location on mount
   useEffect(() => {
@@ -24,6 +40,7 @@ export const AISearch: React.FC = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setLocation(`${position.coords.latitude},${position.coords.longitude}`);
+          setLatLng({ lat: position.coords.latitude, lng: position.coords.longitude });
           setDetectingLocation(false);
         },
         () => {
@@ -32,6 +49,38 @@ export const AISearch: React.FC = () => {
       );
     }
   }, []);
+
+  const fetchSwiggyMenu = async (restaurantId: string) => {
+    if (!latLng) {
+      setError("Location not detected. Please enable location services.");
+      return;
+    }
+
+    setLoadingMenu(true);
+    setError(null);
+    setSwiggyMenu(null);
+    setSelectedRestaurant(restaurantId);
+
+    try {
+      const resp = await getSwiggyMenu({
+        lat: latLng.lat,
+        lng: latLng.lng,
+        restaurantId,
+      });
+      const data = resp.data as any;
+      
+      if (data.success && data.dishes) {
+        setSwiggyMenu(data.dishes);
+      } else {
+        setError("No menu items found");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to load menu");
+      console.error("Swiggy Menu Error:", err);
+    } finally {
+      setLoadingMenu(false);
+    }
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +184,50 @@ export const AISearch: React.FC = () => {
                 {result}
               </pre>
             </div>
+          </div>
+        )}
+
+        {/* Swiggy Menu Display */}
+        {swiggyMenu && swiggyMenu.length > 0 && (
+          <div className="mt-6 bg-white rounded-xl p-6 border border-orange-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Utensils className="w-5 h-5 text-orange-600" />
+              Menu ({swiggyMenu.length} dishes)
+            </h3>
+            <div className="grid gap-4">
+              {swiggyMenu.map((dish) => (
+                <div key={dish.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">{dish.isVeg ? '🥦' : '🍗'}</span>
+                        <h4 className="font-semibold text-gray-900">{dish.name}</h4>
+                      </div>
+                      {dish.description && (
+                        <p className="text-sm text-gray-600">{dish.description}</p>
+                      )}
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="font-bold text-orange-600">₹{dish.price}</p>
+                      {dish.rating && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                          <span className="text-sm font-medium">{dish.rating}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{dish.category}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {loadingMenu && (
+          <div className="mt-6 text-center">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-orange-500" />
+            <p className="text-sm text-gray-600 mt-2">Loading menu...</p>
           </div>
         )}
 

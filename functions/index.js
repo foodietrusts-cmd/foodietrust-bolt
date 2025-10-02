@@ -309,3 +309,95 @@ exports.aiMultiProvider = functions
       throw new functions.https.HttpsError("internal", "AI service temporarily unavailable: " + err.message);
     }
   });
+
+/**
+ * Swiggy Menu Fetcher - Get dish-level menu for a restaurant
+ */
+exports.getSwiggyMenu = functions.runWith(runtimeOptions).https.onCall(async (data, context) => {
+  const { lat, lng, restaurantId } = data;
+
+  // Validate inputs
+  if (!lat || !lng || !restaurantId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Missing required parameters: lat, lng, restaurantId"
+    );
+  }
+
+  console.log(`[getSwiggyMenu] Fetching menu for restaurant ${restaurantId} at ${lat},${lng}`);
+
+  try {
+    const swiggyUrl = `https://www.swiggy.com/dapi/menu/pl?page-type=REGULAR_MENU&complete-menu=true&lat=${lat}&lng=${lng}&restaurantId=${restaurantId}`;
+    
+    const response = await http.get(swiggyUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.data || !response.data.data) {
+      throw new Error("Invalid response from Swiggy API");
+    }
+
+    // Extract menu items from Swiggy's nested structure
+    const menuData = response.data.data;
+    const cards = menuData?.cards || [];
+    
+    const dishes = [];
+    
+    // Parse through Swiggy's card structure to find menu items
+    for (const card of cards) {
+      const groupedCard = card?.groupedCard?.cardGroupMap?.REGULAR?.cards || [];
+      
+      for (const menuCard of groupedCard) {
+        const itemCards = menuCard?.card?.card?.itemCards || [];
+        
+        for (const item of itemCards) {
+          const info = item?.card?.info || {};
+          
+          if (info.name) {
+            dishes.push({
+              id: info.id || `dish-${dishes.length}`,
+              name: info.name,
+              price: info.price ? info.price / 100 : info.defaultPrice ? info.defaultPrice / 100 : 0,
+              description: info.description || "",
+              isVeg: info.isVeg === 1 || info.itemAttribute?.vegClassifier === "VEG",
+              rating: info.ratings?.aggregatedRating?.rating || null,
+              ratingCount: info.ratings?.aggregatedRating?.ratingCountV2 || null,
+              imageId: info.imageId || null,
+              category: menuCard?.card?.card?.title || "General",
+            });
+          }
+        }
+      }
+    }
+
+    console.log(`[getSwiggyMenu] Found ${dishes.length} dishes for restaurant ${restaurantId}`);
+
+    return {
+      success: true,
+      restaurantId,
+      restaurantName: menuData?.cards?.[0]?.card?.card?.info?.name || "Unknown",
+      dishes,
+      totalDishes: dishes.length,
+    };
+
+  } catch (err) {
+    console.error("[getSwiggyMenu error]", {
+      message: err?.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
+
+    // Handle specific error cases
+    if (err?.response?.status === 404) {
+      throw new functions.https.HttpsError("not-found", "Restaurant menu not found on Swiggy");
+    }
+
+    throw new functions.https.HttpsError(
+      "internal",
+      `Failed to fetch menu: ${err.message}`
+    );
+  }
+});
