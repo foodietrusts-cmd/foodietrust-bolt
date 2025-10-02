@@ -35,14 +35,25 @@ export const AISearch: React.FC = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation(`${position.coords.latitude},${position.coords.longitude}`);
+          const coords = `${position.coords.latitude},${position.coords.longitude}`;
+          console.log("Location detected:", coords);
+          setLocation(coords);
           setLatLng({ lat: position.coords.latitude, lng: position.coords.longitude });
         },
-        () => {
+        (error) => {
+          console.error("Location detection failed:", error);
           // Location detection failed, use default location
-          setLocation("12.9716,77.5946"); // Bangalore coordinates as default
+          setLocation("30.2672,-97.7431"); // Round Rock, Austin coordinates as default
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
         }
       );
+    } else {
+      console.log("Geolocation not supported");
+      setLocation("30.2672,-97.7431"); // Default to Round Rock, Austin
     }
   }, []);
 
@@ -81,14 +92,21 @@ export const AISearch: React.FC = () => {
     e.preventDefault();
     if (!query.trim()) return;
 
+    // Ensure we have location data
+    if (!location) {
+      console.log("No location detected, using default");
+      setLocation("30.2672,-97.7431"); // Round Rock, Austin coordinates
+    }
+
     setLoading(true);
     setError(null);
     setResults([]);
 
     try {
+      console.log("Submitting search with location:", location);
       const resp = await aiMultiProvider({
         query,
-        location: location || "Current location",
+        location: location || "30.2672,-97.7431",
       });
       const data = resp.data as any;
 
