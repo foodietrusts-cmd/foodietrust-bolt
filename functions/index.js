@@ -407,7 +407,7 @@ exports.aiMultiProvider = functions
       const foodPart = extractFoodFromQuery(dishQuery);
 
       const extras = {
-        location: location === "current" ? data?.location : location,
+        location: location === "current" ? data?.location : (location || null),
         context: data?.context,
       };
 
@@ -458,23 +458,24 @@ exports.aiMultiProvider = functions
 
       // Return mock data even on error
       const fallbackFoodPart = extractFoodFromQuery(query);
+      const fallbackLocation = location && location !== "current" ? location : null;
 
       return {
         provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation ? ` in ${fallbackLocation}` : ''}:
 
 🍕 **${fallbackFoodPart} Palace**
-📍 Multiple locations available
+📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Multiple locations available
 ⭐ 4.5/5 (127 reviews)
 A popular restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
 
 🍕 **${fallbackFoodPart} Corner**
-📍 Various locations
+📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Various locations
 ⭐ 4.3/5 (89 reviews)
 Well-known spot for delicious ${fallbackFoodPart} options.
 
 🍕 **${fallbackFoodPart} Express**
-📍 Available nationwide
+📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Available nationwide
 ⭐ 4.2/5 (156 reviews)
 Great ${fallbackFoodPart} restaurant with quick service.
 
