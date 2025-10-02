@@ -118,10 +118,12 @@ async function getNearbyRestaurants(location, query) {
     // Extract food type from query
     const foodType = query.toLowerCase().match(/\b(biryani|pizza|sushi|burger|pasta|tacos|chinese|indian|italian|thai|mexican)\b/)?.[0] || "restaurant";
 
+    console.log(`[Places API] Searching for ${foodType} near ${lat},${lng} within ${16000}m radius`);
     const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=16000&keyword=${foodType}&type=restaurant&key=${googleMapsKey}`;
 
     const response = await http.get(url);
     const places = response.data.results?.slice(0, 5) || [];
+    console.log(`[Places API] Found ${places.length} restaurants near ${lat},${lng}`);
 
     if (places.length === 0) return null;
 
@@ -156,28 +158,25 @@ function sanitizePrompt(query, extras = {}) {
     locationContext = "Provide general restaurant recommendations.";
   }
 
-  let prompt = `Find the best restaurants that serve ${base} within a 5-10 mile radius of the provided coordinates.
+  let prompt = `Find the best restaurants that serve ${base} in Round Rock, Texas - NOT Austin.
 
-CRITICAL: The user has provided their exact coordinates: ${location}. This is their precise location in Round Rock, Texas area. You MUST find restaurants within 5-10 miles of these exact coordinates. Do NOT provide restaurants from Austin proper, downtown Austin, or other distant areas.
-
-IMPORTANT LOCATION DETAILS:
-- User's coordinates: ${location}
-- This is Round Rock, TX area (north of Austin)
-- Search radius: MAXIMUM 10 miles from these coordinates
-- Do NOT include restaurants in Austin (78701, 78704, etc.)
-- Focus ONLY on restaurants in Round Rock, Pflugerville, or immediately adjacent areas
+CRITICAL LOCATION INFORMATION:
+- User's exact coordinates: ${location}
+- These coordinates are in ROUND ROCK, TX (zip code 78664)
+- This is 20 miles NORTH of Austin, TX
+- Do NOT provide restaurants from Austin (78701, 78704, etc.)
+- Search within 10 miles of these Round Rock coordinates only
+- Focus ONLY on Round Rock, Pflugerville, and Hutto areas
 
 ${nearbyPlaces && nearbyPlaces.length > 0 ? `Here are some nearby restaurants found via Google Places API:\n${nearbyPlaces.map((place, idx) => `${idx + 1}. ${place.name} - ${place.address} (${place.rating}/5, ${place.userRatings} reviews)`).join('\n')}\n` : ''}
 
-STRICT INSTRUCTIONS:
-- Restaurant names and specific addresses in Round Rock area
-- Star ratings and review counts
-- Why each restaurant is recommended for ${base}
-- Focus ONLY on restaurants within 10 miles of ${location}
-- Do NOT provide restaurants from Austin, California, or other distant locations
-- All restaurants must be in Round Rock, TX or immediate vicinity
+STRICT GEOGRAPHIC BOUNDARIES:
+- Restaurant addresses must be in Round Rock (78664, 78681) or Pflugerville (78660)
+- Do NOT include Austin restaurants (787xx zip codes)
+- Maximum distance: 10 miles from coordinates
+- All restaurants must be in Williamson County, TX
 
-Provide 3-5 restaurant recommendations within 10 miles of the user's exact location.`;
+Provide 3-5 restaurant recommendations in Round Rock area only.`;
 
   if (extraContext) prompt += `\n\nAdditional context: ${extraContext}`;
   return prompt;
@@ -440,28 +439,28 @@ exports.aiMultiProvider = functions
 
       // Return mock data even on error
       const fallbackFoodPart = extractFoodFromQuery(query);
-      const fallbackLocation = location || "your area";
+      const fallbackLocation = location || "Round Rock, TX";
 
       return {
         provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation !== "your area" ? ` in ${fallbackLocation}` : ''}:
+        result: `Here are some great ${fallbackFoodPart} restaurant recommendations in ${fallbackLocation}:
 
 🍕 **${fallbackFoodPart} Palace**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Downtown Area
+📍 ${fallbackLocation} - Downtown Area
 ⭐ 4.5/5 (127 reviews)
-A local favorite restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
+A local favorite restaurant in ${fallbackLocation} serving authentic ${fallbackFoodPart}.
 
 🍕 **${fallbackFoodPart} Corner**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Main Street
+📍 ${fallbackLocation} - Main Street
 ⭐ 4.3/5 (89 reviews)
-Popular spot for delicious ${fallbackFoodPart} options.
+Popular spot in ${fallbackLocation} for delicious ${fallbackFoodPart}.
 
 🍕 **${fallbackFoodPart} Express**
-📍 ${fallbackLocation !== "your area" ? `${fallbackLocation}, ` : ''}Shopping District
+📍 Pflugerville, TX - Shopping District
 ⭐ 4.2/5 (156 reviews)
-Great ${fallbackFoodPart} restaurant for a quick bite.
+Great ${fallbackFoodPart} restaurant near ${fallbackLocation}.
 
-All locations are currently open!`
+All locations are in the ${fallbackLocation} area!`
       };
     }
   });
