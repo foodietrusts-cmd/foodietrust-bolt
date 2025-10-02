@@ -106,19 +106,31 @@ export const AISearch: React.FC = () => {
       console.log("Submitting search with location:", location);
       const resp = await aiMultiProvider({
         query,
-        location: location || "30.2672,-97.7431",
+        location: location ? {
+          lat: parseFloat(location.split(',')[0]),
+          lng: parseFloat(location.split(',')[1]),
+          city: 'Round Rock',
+          state: 'TX'
+        } : null,
       });
       const data = resp.data as any;
 
       // Check if there's an error (like non-food query)
       if (data.error) {
-        setError(data.error);
+        if (data.needsLocation) {
+          setError("Location access required. Please enable location services to get restaurant recommendations.");
+        } else {
+          setError(data.error);
+        }
         return;
       }
 
       // Handle both text format (from mock) and structured format (from real API)
-      if (typeof data.result === 'string') {
-        // Text format - show as formatted result
+      if (data.response) {
+        // New format - text response with real restaurant data
+        setResult(data.response);
+      } else if (typeof data.result === 'string') {
+        // Legacy format - show as formatted result
         setResult(data.result);
       } else {
         // Structured format - use existing logic

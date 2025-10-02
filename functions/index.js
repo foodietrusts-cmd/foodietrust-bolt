@@ -389,108 +389,168 @@ async function tryProvidersInOrder(prompt, models) {
   throw new Error("All providers failed. Errors: " + JSON.stringify(errors));
 }
 
-exports.aiMultiProvider = functions
-  .runWith(runtimeOptions)
-  .https.onCall(async (data, context) => {
-    console.log("[aiMultiProvider] Request received:", { query: data?.query });
+exports.aiMultiProvider = functions.https.onCall(async (data, context) => {
+  try {
+    const query = data.query;
+    const userLocation = data.location;
 
-    try {
-      const query = data?.query;
-      if (typeof query !== "string" || !query.trim()) {
-        console.error("[aiMultiProvider] Invalid query:", query);
-        throw new functions.https.HttpsError("invalid-argument", "Field 'query' is required and must be a non-empty string.");
-      }
-
-      // Extract location from query first
-      const { location, dishQuery } = extractLocationFromQuery(query);
-
-      // Check if query is food-related
-      if (!isFoodRelatedQuery(dishQuery)) {
-        return { error: 'Please search for food, dishes, or restaurants only' };
-      }
-
-      // Extract just the food part (remove common prefixes/suffixes)
-      const foodPart = extractFoodFromQuery(dishQuery);
-
-      const extras = {
-        location: location === "current" ? data?.location : (location || null),
-        context: data?.context,
-      };
-
-      // Check cache first
-      const cacheKey = getCacheKey(foodPart, extras.location || "general");
-      const cachedResult = getFromCache(cacheKey);
-      if (cachedResult) {
-        console.log("[aiMultiProvider] Returning cached result");
-        return { ...cachedResult, cached: true };
-      }
-
-      // Get nearby restaurants if location is provided (coordinates or location name)
-      let nearbyPlaces = null;
-      if (extras.location && extras.location.includes(",") && location === "current") {
-        console.log("[aiMultiProvider] Fetching nearby restaurants for user's coordinates:", extras.location);
-        nearbyPlaces = await getNearbyRestaurants(extras.location, foodPart);
-        if (nearbyPlaces && nearbyPlaces.length > 0) {
-          console.log("[aiMultiProvider] Found", nearbyPlaces.length, "real nearby places");
-          extras.nearbyPlaces = nearbyPlaces;
-        } else {
-          console.log("[aiMultiProvider] No nearby places found, using general recommendations");
-        }
-      } else if (extras.location && extras.location !== "current" && !extras.location.includes(",")) {
-        console.log("[aiMultiProvider] Named location provided:", extras.location);
-        // For named locations, don't fetch nearby places via coordinates
-      }
-
-      const models = {
-        GoogleAI: data?.models?.GoogleAI || DEFAULT_MODELS.GoogleAI,
-        Groq: data?.models?.Groq || DEFAULT_MODELS.Groq,
-        OpenRouter: data?.models?.OpenRouter || DEFAULT_MODELS.OpenRouter,
-      };
-
-      const prompt = sanitizePrompt(foodPart, extras);
-      console.log("[aiMultiProvider] Calling providers with prompt:", prompt.substring(0, 200));
-      console.log("[aiMultiProvider] Location data:", { location: extras.location, nearbyPlaces: nearbyPlaces?.length || 0 });
-
-      const result = await tryProvidersInOrder(prompt, models);
-      console.log("[aiMultiProvider] Success! Provider:", result.provider);
-
-      // Cache the result
-      setCache(cacheKey, result);
-
-      return result;
-    } catch (err) {
-      console.error("[aiMultiProvider error]", {
-        message: err?.message,
-        stack: err?.stack,
-      });
-
-      // Return mock data even on error
-      const fallbackFoodPart = extractFoodFromQuery(query);
-      const fallbackLocation = location && location !== "current" ? location : null;
-
+    // STEP 1: VALIDATE LOCATION
+    if (!userLocation?.lat || !userLocation?.lng) {
       return {
-        provider: "Mock",
-        result: `Here are some great ${fallbackFoodPart} restaurant recommendations${fallbackLocation ? ` in ${fallbackLocation}` : ''}:
-
-🍕 **${fallbackFoodPart} Palace**
-📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Multiple locations available
-⭐ 4.5/5 (127 reviews)
-A popular restaurant serving authentic ${fallbackFoodPart} with fresh ingredients.
-
-🍕 **${fallbackFoodPart} Corner**
-📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Various locations
-⭐ 4.3/5 (89 reviews)
-Well-known spot for delicious ${fallbackFoodPart} options.
-
-🍕 **${fallbackFoodPart} Express**
-📍 ${fallbackLocation ? `${fallbackLocation} - ` : ''}Available nationwide
-⭐ 4.2/5 (156 reviews)
-Great ${fallbackFoodPart} restaurant with quick service.
-
-All locations offer high-quality ${fallbackFoodPart}!`
+        error: 'Location required. Please enable location access.',
+        needsLocation: true
       };
     }
-  });
+
+    const locationString = `${userLocation.city}, ${userLocation.state}` ;
+    const coordinates = `${userLocation.lat},${userLocation.lng}` ;
+
+    console.log('=== SEARCH REQUEST ===');
+    console.log('Query:', query);
+    console.log('Location:', locationString);
+    console.log('Coordinates:', coordinates);
+
+    // STEP 2: EXTRACT DISH NAME
+    const dishName = query
+      .replace(/best/gi, '')
+      .replace(/near me/gi, '')
+      .replace(/in [a-z\s]+$/gi, '')
+      .trim();
+
+    // STEP 3: GET REAL RESTAURANTS FROM GOOGLE PLACES
+    const googleMapsKey = functions.config().googlemaps.key;
+
+    const placesResponse = await axios.get(
+      'https://maps.googleapis.com/maps/api/place/textsearch/json',
+      {
+        params: {
+          query: `${dishName} restaurant ${locationString}` ,
+          location: coordinates,
+          radius: 10000, // 10km
+          type: 'restaurant',
+          key: googleMapsKey
+        }
+      }
+    );
+
+    const restaurants = placesResponse.data.results || [];
+
+    console.log(`Found ${restaurants.length} real restaurants from Google Places` );
+
+    // STEP 4: VALIDATE WE HAVE REAL DATA
+    if (restaurants.length === 0) {
+      return {
+        response: `No restaurants found for "${dishName}" near ${locationString}. Try a different search term.` ,
+        restaurantCount: 0
+      };
+    }
+
+    // STEP 5: FORMAT REAL RESTAURANT DATA
+    const formattedRestaurants = restaurants.slice(0, 5).map((place, index) => {
+      return {
+        rank: index + 1,
+        name: place.name,
+        address: place.formatted_address,
+        rating: place.rating || 'N/A',
+        reviewCount: place.user_ratings_total || 0,
+        priceLevel: place.price_level ? '$'.repeat(place.price_level) : 'N/A',
+        isOpen: place.opening_hours?.open_now ? 'Open now' : 'Closed',
+        placeId: place.place_id
+      };
+    });
+
+    console.log('Formatted restaurants:', JSON.stringify(formattedRestaurants, null, 2));
+
+    // STEP 6: CREATE STRICT AI PROMPT
+    const aiPrompt = `You are a restaurant recommendation assistant.
+
+USER LOCATION: ${locationString}
+USER SEARCH: ${query}
+
+REAL RESTAURANT DATA FROM GOOGLE PLACES API:
+${JSON.stringify(formattedRestaurants, null, 2)}
+
+STRICT INSTRUCTIONS:
+1. Use ONLY the restaurants listed above - DO NOT invent or suggest any other restaurants
+2. Present exactly these ${formattedRestaurants.length} restaurants in order
+3. Use the EXACT names and addresses provided
+4. Use the EXACT ratings and review counts provided
+5. DO NOT say "I don't know your location" - the location is ${locationString}
+6. DO NOT ask for clarification - respond with the data above
+7. Format each restaurant as:
+
+[Rank]. **[Exact Restaurant Name]**
+   Address: [Exact Address from data]
+   Rating: [Exact Rating from data] ⭐ ([Exact Review Count] reviews)
+   Price: [Price Level]
+   Status: [Open/Closed status]
+
+   Why visit: [Brief 1-2 sentence recommendation based on ratings and the dish type]
+
+Start your response with: "Here are the top ${formattedRestaurants.length} restaurants for ${dishName} near ${locationString}:"
+
+DO NOT ADD ANY DISCLAIMERS OR NOTES. Just present the data.`;
+
+    // STEP 7: CALL AI WITH STRICT PROMPT
+    const googleAIKey = functions.config().googleai.key;
+
+    const aiResponse = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleAIKey}` ,
+      {
+        contents: [{
+          parts: [{ text: aiPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.3, // Low temperature for factual responses
+          maxOutputTokens: 2000
+        }
+      }
+    );
+
+    const aiText = aiResponse.data.candidates[0].content.parts[0].text;
+
+    // STEP 8: VERIFY AI DIDN'T HALLUCINATE
+    const responseIncludesRealRestaurants = formattedRestaurants.every(r =>
+      aiText.includes(r.name)
+    );
+
+    if (!responseIncludesRealRestaurants) {
+      console.error('AI HALLUCINATED! Returning raw data instead.');
+      // Fallback: Return formatted data directly
+      const fallbackResponse = `Here are the top ${formattedRestaurants.length} restaurants for ${dishName} near ${locationString}:\n\n`  +
+        formattedRestaurants.map(r =>
+          `${r.rank}. **${r.name}**\n`  +
+          `   Address: ${r.address}\n`  +
+          `   Rating: ${r.rating} ⭐ (${r.reviewCount} reviews)\n`  +
+          `   Price: ${r.priceLevel}\n`  +
+          `   Status: ${r.isOpen}\n\n`
+        ).join('');
+
+      return {
+        response: fallbackResponse,
+        location: locationString,
+        restaurantCount: formattedRestaurants.length,
+        dataSource: 'fallback'
+      };
+    }
+
+    // STEP 9: RETURN REAL DATA
+    return {
+      response: aiText,
+      location: locationString,
+      restaurantCount: formattedRestaurants.length,
+      restaurants: formattedRestaurants, // Raw data for debugging
+      dataSource: 'google-places'
+    };
+
+  } catch (error) {
+    console.error('Error in aiMultiProvider:', error);
+    return {
+      error: error.message,
+      details: error.response?.data || 'Unknown error'
+    };
+  }
+});
 
 /**
  * Swiggy Menu Fetcher - Get dish-level menu for a restaurant
