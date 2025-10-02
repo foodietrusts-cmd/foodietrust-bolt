@@ -11,7 +11,7 @@ const runtimeOptions = {
 };
 
 const DEFAULT_MODELS = {
-  GoogleAI: "gemini-1.5-flash-latest",
+  GoogleAI: "gemini-1.5-flash",
   OpenRouter: "meta-llama/llama-3.1-70b-instruct",
   Groq: "llama-3.1-8b-instant",
   Mistral: "mistral-large-latest",

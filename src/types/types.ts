@@ -26,6 +26,8 @@ export interface Review {
   id: string;
   userId: string;
   userName: string;
+  dishName?: string;
+  restaurantName?: string;
   rating: number;
   comment: string;
   enhancedComment?: string;

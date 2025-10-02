@@ -34,6 +34,8 @@ export const UserReviewsTab: React.FC<UserReviewsTabProps> = ({ onSubmitReview }
             id: doc.id,
             userId: data.userId || 'anonymous',
             userName: data.userName || 'Foodie',
+            dishName: data.dishName || '',
+            restaurantName: data.restaurantName || '',
             rating: Number(data.rating) || 0,
             comment: data.comment || '',
             enhancedComment: data.enhancedComment,
@@ -203,6 +205,14 @@ const ReviewCard: React.FC<{ review: Review }> = ({ review }) => {
               <div className="text-sm text-gray-600">Trust: {review.trustScore}</div>
             </div>
           </div>
+
+          {(review.dishName || review.restaurantName) && (
+            <div className="mb-3 flex items-center gap-2 text-sm bg-orange-50 px-3 py-2 rounded-lg border border-orange-100">
+              {review.dishName && <span className="font-semibold text-orange-700">{review.dishName}</span>}
+              {review.dishName && review.restaurantName && <span className="text-gray-400">•</span>}
+              {review.restaurantName && <span className="text-gray-700">{review.restaurantName}</span>}
+            </div>
+          )}
 
           <div className="mb-4">
             <div className="flex items-center space-x-2 mb-2">
