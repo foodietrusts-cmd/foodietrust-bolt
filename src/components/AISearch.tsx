@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Search, Sparkles, Loader2, AlertCircle, MapPin, Zap, ChevronRight, Star, Utensils } from "lucide-react";
+import { Search, Sparkles, Loader2, AlertCircle, Star } from "lucide-react";
 import { aiMultiProvider, getSwiggyMenu } from "../lib/firebase";
-
-interface AIResponse {
-  provider: string;
-  result: string;
-}
+import { mockDishes } from "../data/mockData";
 
 interface SwiggyDish {
   id: string;
@@ -20,31 +16,29 @@ interface SwiggyDish {
 }
 
 export const AISearch: React.FC = () => {
-  const [query, setQuery] = useState("Best biryani near me");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<string>("");
-  const [cached, setCached] = useState(false);
-  const [detectingLocation, setDetectingLocation] = useState(false);
   const [swiggyMenu, setSwiggyMenu] = useState<SwiggyDish[] | null>(null);
   const [loadingMenu, setLoadingMenu] = useState(false);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<string | null>(null);
   const [latLng, setLatLng] = useState<{lat: number, lng: number} | null>(null);
+
+  // Get trending dishes from mock data
+  const trendingDishes = mockDishes.filter(dish => dish.tags.includes('Trending')).slice(0, 6);
 
   // Detect user location on mount
   useEffect(() => {
     if (navigator.geolocation) {
-      setDetectingLocation(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setLocation(`${position.coords.latitude},${position.coords.longitude}`);
           setLatLng({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setDetectingLocation(false);
         },
         () => {
-          setDetectingLocation(false);
+          // Location detection failed, use default location
+          setLocation("12.9716,77.5946"); // Bangalore coordinates as default
         }
       );
     }
@@ -59,7 +53,6 @@ export const AISearch: React.FC = () => {
     setLoadingMenu(true);
     setError(null);
     setSwiggyMenu(null);
-    setSelectedRestaurant(restaurantId);
 
     try {
       const resp = await getSwiggyMenu({
@@ -68,7 +61,7 @@ export const AISearch: React.FC = () => {
         restaurantId,
       });
       const data = resp.data as any;
-      
+
       if (data.success && data.dishes) {
         setSwiggyMenu(data.dishes);
       } else {
@@ -89,8 +82,6 @@ export const AISearch: React.FC = () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    setProvider(null);
-    setCached(false);
 
     try {
       const resp = await aiMultiProvider({
@@ -98,9 +89,7 @@ export const AISearch: React.FC = () => {
         location: location || "Current location",
       });
       const data = resp.data as any;
-      setProvider(data.provider);
       setResult(data.result);
-      setCached(data.cached || false);
     } catch (err: any) {
       setError(err?.message || "Request failed. Please try again.");
       console.error("AI Search Error:", err);
@@ -110,61 +99,53 @@ export const AISearch: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-6">
       <div className="bg-white rounded-2xl shadow-lg p-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Discover Amazing Dishes Near You
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Find the best food with our AI-powered recommendations and verified reviews from millions of food lovers
+          </p>
+        </div>
+
         {/* Search Form */}
-        <form onSubmit={onSubmit} className="mb-6">
-          <div className="relative">
+        <form onSubmit={onSubmit} className="mb-8">
+          <div className="relative max-w-2xl mx-auto">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Best biryani near me"
-              className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all outline-none text-gray-900"
+              placeholder="Search dishes, restaurants, or cuisines..."
+              className="w-full pl-12 pr-4 py-4 text-lg border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white shadow-sm"
               disabled={loading}
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="mt-4 w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Searching...
-              </>
-            ) : (
-              <>
-                <Search className="w-5 h-5" />
-                Ask FoodieTrust
-              </>
-            )}
-          </button>
+          <div className="text-center mt-4">
+            <button
+              type="submit"
+              disabled={loading || !query.trim()}
+              className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-8 rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Searching...
+                </>
+              ) : (
+                <>
+                  <Search className="w-5 h-5" />
+                  Ask FoodieTrust
+                </>
+              )}
+            </button>
+          </div>
         </form>
 
-        {/* Provider Badge - Hidden for now */}
-        {/* {provider && (
-          <div className="mb-4 flex gap-2">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-green-700">
-                Found by {provider}
-              </span>
-            </div>
-            {cached && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <Zap className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">
-                  Quick result
-                </span>
-              </div>
-            )}
-          </div>
-        )} */}
-
-        {/* Result */}
+        {/* Search Results */}
         {result && (
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border border-purple-100">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Found these amazing dishes:</h3>
@@ -176,12 +157,45 @@ export const AISearch: React.FC = () => {
           </div>
         )}
 
+        {/* Trending Dishes Section - Show when no search */}
+        {!query && !result && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-6">
+              <Sparkles className="w-5 h-5 text-orange-500" />
+              <h3 className="text-xl font-semibold text-gray-900">Trending Now</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {trendingDishes.map(dish => (
+                <div key={dish.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 mb-1">{dish.name}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{dish.cuisine}</p>
+                      <p className="text-sm text-gray-500">{dish.description}</p>
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="font-bold text-orange-600">₹{dish.price}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                        <span className="text-sm font-medium">{dish.averageRating}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>{dish.reviewCount} reviews</span>
+                    <span className="bg-gray-100 px-2 py-1 rounded">{dish.restaurant.name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Swiggy Menu Display */}
         {swiggyMenu && swiggyMenu.length > 0 && (
           <div className="mt-6 bg-white rounded-xl p-6 border border-orange-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Utensils className="w-5 h-5 text-orange-600" />
-              Menu ({swiggyMenu.length} dishes)
+              🍽️ Menu ({swiggyMenu.length} dishes)
             </h3>
             <div className="grid gap-4">
               {swiggyMenu.map((dish) => (

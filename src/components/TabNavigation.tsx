@@ -12,6 +12,12 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
 
   const tabs = [
     {
+      id: 'aisearch' as const,
+      label: 'Discover',
+      icon: Bot,
+      description: 'Find amazing dishes'
+    },
+    {
       id: 'reviews' as const,
       label: 'Reviews',
       icon: MessageSquare,
@@ -22,12 +28,6 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({ activeTab, onTabCh
       label: 'Featured',
       icon: Sparkles,
       description: 'Restaurant specials'
-    },
-    {
-      id: 'aisearch' as const,
-      label: 'Discover',
-      icon: Bot,
-      description: 'Find amazing dishes'
     },
     ...(user ? [{
       id: 'analytics' as const,

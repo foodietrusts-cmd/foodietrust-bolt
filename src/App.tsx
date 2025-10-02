@@ -22,7 +22,7 @@ import type { Dish, FilterOptions, ReviewPost, UserReviewSubmission } from './ty
 
 function AppContent() {
   const [dishes, setDishes] = useState<Dish[]>(mockDishes);
-  const [activeTab, setActiveTab] = useState<'reviews' | 'promotions' | 'analytics' | 'aisearch'>('reviews');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'promotions' | 'analytics' | 'aisearch'>('aisearch');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({
     cuisine: [],
@@ -280,110 +280,12 @@ function AppContent() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Tab Content */}
         {activeTab === 'aisearch' && (
-          <>
-            {/* Search Section */}
-            <SearchHeader 
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              showFilters={showFilters}
-              onToggleFilters={() => setShowFilters(!showFilters)}
-            />
-
-            {/* Filter Panel */}
-            {showFilters && (
-              <FilterPanel 
-                filters={selectedFilters}
-                onFiltersChange={setSelectedFilters}
-              />
-            )}
-
-            {/* Trending Section */}
-            {searchQuery === '' && (
-              <>
-                <TrendingSection dishes={trendingDishes} favorites={favorites} onToggleFavorite={toggleFavorite} />
-                
-                {/* Inline Ad */}
-                <AdBanner 
-                  placement="inline" 
-                  onAdClick={handleAdClick}
-                  onAdClose={handleAdClose}
-                />
-              </>
-            )}
-
-            {/* Personalized Recommendations */}
-            {searchQuery === '' && (
-              <PersonalizedRecommendations 
-                dishes={recommendedDishes} 
-                favorites={favorites} 
-                onToggleFavorite={toggleFavorite} 
-              />
-            )}
-
-            {/* Search Results */}
-            {searchQuery === '' && <CommunityStats />}
-            
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {searchQuery ? `Search Results (${filteredDishes.length})` : 'All Dishes'}
-                </h2>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Clock className="w-4 h-4" />
-                  <span>Updated 2 hours ago</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredDishes.map(dish => (
-                  <div key={dish.id} id={`dish-${dish.id}`} className="transition-all duration-300">
-                    <DishCard 
-                      dish={dish} 
-                      isFavorite={favorites.has(dish.id)}
-                      onToggleFavorite={() => toggleFavorite(dish.id)}
-                      onWriteReview={() => handleWriteReview(dish)}
-                      onReferralClick={handleReferralClick}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              {filteredDishes.length === 0 && (
-                <div className="text-center py-12">
-                  <Utensils className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No dishes found</h3>
-                  <p className="text-gray-500">Try adjusting your search or filters</p>
-                </div>
-              )}
-            </div>
-
-            {/* Bottom Ad Banner */}
-            <AdBanner 
-              placement="bottom" 
-              onAdClick={handleAdClick}
-              onAdClose={handleAdClose}
-            />
-          </>
-        )}
-
-        {activeTab === 'reviews' && (
-          <UserReviewsTab onSubmitReview={handleSubmitUserReview} />
-        )}
-        {activeTab === 'promotions' && (
-          <RestaurantPromotionsTab />
-        )}
-
-        {activeTab === 'analytics' && user && (
-          <RevenueAnalytics />
-        )}
-
-        {activeTab === 'aisearch' && (
           <AISearch />
         )}
       </div>
 
       {/* AI Chat */}
-      <AIChat dishes={dishes} onDishRecommend={handleDishRecommend} />
+{{ ... }}
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => {
