@@ -100,7 +100,7 @@ function AppContent() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Update dish with new review (mock implementation)
-      setDishes(prevDishes => 
+      setDishes(prevDishes =>
         prevDishes.map(dish => {
           if (dish.id === reviewData.dishId) {
             const newReview = {
@@ -113,12 +113,18 @@ function AppContent() {
               date: new Date().toISOString(),
               helpful: 0,
               verified: user!.isVerified,
-              userTrustScore: user!.trustScore
+              userTrustScore: user!.trustScore,
+              likes: 0,
+              isHelpful: false,
+              tags: [],
+              dishType: dish.category,
+              visualAppeal: 5,
+              wouldRecommend: true
             };
-            
+
             const updatedReviews = [...dish.reviews, newReview];
             const newAverageRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0) / updatedReviews.length;
-            
+
             return {
               ...dish,
               reviews: updatedReviews,
@@ -285,7 +291,7 @@ function AppContent() {
       </div>
 
       {/* AI Chat */}
-{{ ... }}
+      <AIChat dishes={dishes} onDishRecommend={handleDishRecommend} />
       <AuthModal 
         isOpen={showAuthModal} 
         onClose={() => {
